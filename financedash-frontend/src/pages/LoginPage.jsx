@@ -13,7 +13,7 @@ function LoginPage({ onLogin }) {
 
     try {
       if (isSignup) {
-        await api.post("/register", { username, password });
+        await api.post("/auth/register", { username, password });
         setIsSignup(false);
         setUsername("");
         setPassword("");
