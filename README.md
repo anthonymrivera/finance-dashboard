@@ -131,9 +131,9 @@ Open your browser and navigate to `http://localhost:5173`
 
 ## 📚 Documentation
 
-- [Backend Documentation](./backend/README.md) - API endpoints, security, and backend setup
-- [Frontend Documentation](./frontend/README.md) - Component structure and frontend setup
-- [API Reference](./backend/API.md) - Detailed API endpoint documentation
+- [Backend Documentation](./financedash/README.md) - API endpoints, security, and backend setup
+- [Frontend Documentation](./financedash-frontend/README.md) - Component structure and frontend setup
+- [API Reference](./financedash/API.md) - Detailed API endpoint documentation
 
 ## 🔒 Security
 
@@ -239,7 +239,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Support
 
-For support, email your.email@example.com or open an issue on GitHub.
+For support, email anthonymrivera824@gmail.com or open an issue on GitHub.
 
 ---
 
