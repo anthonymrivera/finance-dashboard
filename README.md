@@ -131,9 +131,9 @@ Open your browser and navigate to `http://localhost:5173`
 
 ## 📚 Documentation
 
-- [Backend Documentation](./backend/README.md) - API endpoints, security, and backend setup
-- [Frontend Documentation](./frontend/README.md) - Component structure and frontend setup
-- [API Reference](./backend/API.md) - Detailed API endpoint documentation
+- [Backend Documentation](./financedash/README.md) - API endpoints, security, and backend setup
+- [Frontend Documentation](./financedash-frontend/README.md) - Component structure and frontend setup
+- [API Reference](./financedash/API.md) - Detailed API endpoint documentation
 
 ## 🔒 Security
 
