@@ -1,0 +1,12 @@
+spring.application.name=financedash
+spring.datasource.url=jdbc:postgresql://localhost:5432/financedash
+spring.datasource.username=${DB_USERNAME:postgres}
+spring.datasource.password=${DB_PASSWORD:CHANGE_ME}
+
+spring.jpa.hibernate.ddl-auto=validate
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.format_sql=true
+
+# use a long random string (at least 32 chars)
+jwt.secret=${JWT_SECRET:REPLACE_WITH_STRONG_256_BIT_KEY}
+jwt.expiration-ms=86400000

@@ -1,0 +1,177 @@
+# ================================================================
+# Finance Dashboard Monorepo - .gitignore
+# Project structure: /frontend and /backend folders
+# ================================================================
+
+# ================================================================
+# CRITICAL SECURITY FILES - NEVER COMMIT
+# ================================================================
+**/application.properties
+**/application-dev.properties
+**/application-prod.properties
+**/application-local.properties
+**/.env
+**/.env.local
+**/.env.*.local
+*.env
+
+# ================================================================
+# BACKEND (Spring Boot / Java)
+# ================================================================
+
+# Compiled class files
+backend/**/*.class
+*.class
+
+# Package Files
+backend/**/*.jar
+backend/**/*.war
+backend/**/*.nar
+backend/**/*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# Maven
+backend/target/
+backend/pom.xml.tag
+backend/pom.xml.releaseBackup
+backend/pom.xml.versionsBackup
+backend/release.properties
+backend/dependency-reduced-pom.xml
+backend/.mvn/timing.properties
+backend/.mvn/wrapper/maven-wrapper.jar
+
+# Spring Boot
+backend/spring-boot-devtools.properties
+
+# Database files
+backend/**/*.db
+backend/**/*.sqlite
+backend/**/*.sqlite3
+backend/**/*.h2.db
+
+# ================================================================
+# FRONTEND (React / Node)
+# ================================================================
+
+# Dependencies
+frontend/node_modules/
+node_modules/
+
+# Production build
+frontend/build/
+frontend/dist/
+frontend/.next/
+frontend/out/
+
+# Testing
+frontend/coverage/
+frontend/.nyc_output
+
+# Cache and temporary files
+frontend/.cache/
+frontend/.parcel-cache/
+frontend/.vite/
+
+# Environment files
+frontend/.env
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+
+# Debug logs
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/lerna-debug.log*
+frontend/.pnpm-debug.log*
+
+# Misc
+frontend/.DS_Store
+frontend/Thumbs.db
+
+# ================================================================
+# IDE FILES
+# ================================================================
+
+# IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+
+# Eclipse
+.classpath
+.project
+.settings/
+bin/
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# NetBeans
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+# ================================================================
+# OS FILES
+# ================================================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ================================================================
+# LOG FILES
+# ================================================================
+*.log
+logs/
+log/
+backend/logs/
+frontend/logs/
+
+# ================================================================
+# TEMPORARY FILES
+# ================================================================
+*.tmp
+*.bak
+*.swp
+*.swo
+*~.nib
+tmp/
+temp/
+*.orig
+
+# ================================================================
+# KEEP THESE TEMPLATE FILES (DON'T IGNORE)
+# ================================================================
+!backend/**/application.properties.template
+!backend/**/application-dev.properties.template
+!backend/**/application-prod.properties.template
+!frontend/**/.env.example
+!frontend/**/.env.template
