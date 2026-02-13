@@ -13,13 +13,13 @@ function LoginPage({ onLogin }) {
 
     try {
       if (isSignup) {
-        await api.post("/auth/register", { username, password });
+        await api.post("/api/auth/register", { username, password });
         setIsSignup(false);
         setUsername("");
         setPassword("");
         setError("Account created! Please log in.");
       } else {
-        const res = await api.post("/auth/login", { username, password });
+        const res = await api.post("/api/auth/login", { username, password });
         localStorage.setItem("token", res.data.token);
         onLogin();
       }

@@ -19,7 +19,7 @@ export default function TransactionsPage({ onTransactionAdded }) {
   // Load accounts
   useEffect(() => {
     async function loadAccounts() {
-      const res = await api.get("/accounts");
+      const res = await api.get("/api/accounts");
       setAccounts(res.data);
       if (res.data.length) setAccountId(res.data[0].id);
     }

@@ -1,6 +1,5 @@
 // src/AccountsPage.jsx
 import { useEffect, useState } from "react";
-import axios from "axios";
 import api from "../api/axiosConfig";
 
 const API_BASE = "http://127.0.0.1:8080";
@@ -32,7 +31,7 @@ function AccountsPage() {
       setLoading(true);
       setError(null);
 
-      const res = await api.get("/accounts");
+      const res = await api.get("/api/accounts");
       setAccounts(res.data || []);
     } catch (err) {
       console.error("loadAccounts error", err);
