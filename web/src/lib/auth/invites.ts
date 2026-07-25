@@ -1,6 +1,7 @@
 import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { invites, users } from "@/db/schema";
+import { isEmailAllowed } from "@/lib/env";
 
 /**
  * Registration allowlist.
@@ -18,6 +19,10 @@ export async function isFirstRun(): Promise<boolean> {
 }
 
 export async function canRegister(email: string): Promise<boolean> {
+  // The env allowlist outranks everything, including first-run bootstrap: if it
+  // is set, an address outside it can never create an account.
+  if (!isEmailAllowed(email)) return false;
+
   if (await isFirstRun()) return true;
 
   const invite = await db.query.invites.findFirst({

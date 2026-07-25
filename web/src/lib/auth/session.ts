@@ -4,7 +4,7 @@ import { cache } from "react";
 import { eq, lt } from "drizzle-orm";
 import { db } from "@/db";
 import { sessions, users, type User } from "@/db/schema";
-import { isProd } from "@/lib/env";
+import { isProd, isEmailAllowed } from "@/lib/env";
 
 const COOKIE_NAME = "fd_session";
 const SESSION_DURATION_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
@@ -66,6 +66,11 @@ export const getCurrentUser = cache(async (): Promise<User | null> => {
   // A deactivated user must lose access immediately. The original app never
   // checked this, so `isActive` was decorative.
   if (!row.user.isActive) return null;
+
+  // Enforced here as well as at each sign-in path, so an address dropped from
+  // ALLOWED_EMAILS loses access on its very next request rather than lingering
+  // until its session expires.
+  if (!isEmailAllowed(row.user.email)) return null;
 
   if (row.expiresAt.getTime() - Date.now() < RENEW_THRESHOLD_MS) {
     const renewed = new Date(Date.now() + SESSION_DURATION_MS);

@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "setup": "node scripts/setup.mjs",
+    "setup:google": "node scripts/setup-google.mjs",
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",

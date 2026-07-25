@@ -7,7 +7,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { users } from "@/db/schema";
-import { env, isProd } from "@/lib/env";
+import { env, isProd, isEmailAllowed } from "@/lib/env";
 import { hashPassword, validatePasswordStrength, verifyPassword } from "./password";
 import { createSession, destroySession } from "./session";
 import { rateLimit, resetRateLimit } from "./rate-limit";
@@ -112,8 +112,9 @@ export async function login(_prev: AuthState, formData: FormData): Promise<AuthS
   const valid = await verifyPassword(user?.passwordHash ?? DUMMY_HASH, parsed.data.password);
 
   // One message for every failure mode. A Google-only account has no password
-  // hash, so it falls through here too rather than revealing how it signs in.
-  if (!user || !user.passwordHash || !valid || !user.isActive) {
+  // hash, so it falls through here too rather than revealing how it signs in —
+  // and a non-allowlisted address is indistinguishable from a wrong password.
+  if (!user || !user.passwordHash || !valid || !user.isActive || !isEmailAllowed(user.email)) {
     return { error: "Incorrect email or password" };
   }
 

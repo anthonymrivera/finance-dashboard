@@ -6,7 +6,7 @@ import { users } from "@/db/schema";
 import { googleClient, parseIdToken } from "@/lib/auth/google";
 import { canRegister, consumeInvite } from "@/lib/auth/invites";
 import { createSession } from "@/lib/auth/session";
-import { googleEnabled, env } from "@/lib/env";
+import { googleEnabled, env, isEmailAllowed } from "@/lib/env";
 
 export const runtime = "nodejs";
 
@@ -41,6 +41,13 @@ export async function GET(request: Request) {
     // would let an attacker claim an existing account by email match.
     if (!profile.emailVerified) {
       return NextResponse.redirect(`${env.APP_URL}/login?error=email_unverified`);
+    }
+
+    // This endpoint is reachable by anyone holding any Google account, so the
+    // allowlist is checked before any account lookup, creation, or linking.
+    if (!isEmailAllowed(profile.email)) {
+      console.warn("[auth] google sign-in refused for non-allowlisted address");
+      return NextResponse.redirect(`${env.APP_URL}/login?error=not_invited`);
     }
 
     const existingByGoogleId = await db.query.users.findFirst({
