@@ -22,22 +22,37 @@ policy says so plainly rather than claiming a control that does not exist.
 
 ## 2. Identity and access management
 
-**Application access.** Sign-in is by Google OAuth 2.0 with PKCE, or by email and
-password. An allowlist of permitted email addresses is held in deployment
-configuration and enforced at every authentication path *and* on every
-subsequent request, so removing an address revokes access on its next request
-rather than at session expiry. Registration is closed: no new account can be
-created outside that allowlist.
+**Application access.** All accounts in the deployed configuration authenticate
+solely through Google OAuth 2.0 with PKCE. No account has a password set, so
+there is no password-based path into the application and no password to phish,
+guess, or reset.
 
-**Second factor.** Time-based one-time passwords (TOTP, RFC 6238) are supported.
-Codes are single-use — the accepted time step is recorded and refused
-thereafter — and failed attempts are counted in the database with lockout, so
-the limit holds across serverless instances rather than resetting per process.
-Disabling the second factor, or enrolling a new device, requires a current code.
+The federated Google account enforces **phishing-resistant multi-factor
+authentication using passkeys** (FIDO2/WebAuthn). Because the credential is
+bound to the origin, an adversary-in-the-middle proxy cannot relay it. Multi-factor
+authentication is therefore mandatory before the application — and before Plaid
+Link — can be reached, and it is enforced by the identity provider rather than
+by application code.
+
+An allowlist of permitted email addresses is held in deployment configuration
+and enforced at every authentication path *and* on every subsequent request, so
+removing an address revokes access on its next request rather than at session
+expiry. Registration is closed: no new account can be created outside that
+allowlist.
+
+**Application-level second factor.** The application additionally implements
+time-based one-time passwords (TOTP, RFC 6238) for accounts that use a password.
+Codes are single-use — the accepted time step is recorded and refused thereafter
+— and failed attempts are counted in the database with lockout, so the limit
+holds across serverless instances rather than resetting per process. Disabling
+the second factor, or enrolling a new device, requires a current code. This
+control is not currently engaged, because no account uses a password and the
+identity provider already enforces a stronger, phishing-resistant factor.
 
 **Administrative access.** Hosting (Vercel), database (Neon), source control
 (GitHub), and the Plaid dashboard are each accessed through an individual
-account secured with multi-factor authentication. No shared credentials exist.
+account secured with multi-factor authentication, federated to the same
+passkey-protected Google account where supported. No shared credentials exist.
 
 **Authorization.** Every database query is scoped by the authenticated user's
 identifier. This was verified across all query sites during a pre-launch review.
