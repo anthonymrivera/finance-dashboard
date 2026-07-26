@@ -175,3 +175,6 @@ temp/
 !backend/**/application-prod.properties.template
 !frontend/**/.env.example
 !frontend/**/.env.template
+
+# Generated PDFs (rebuild from the .md sources)
+web/docs/*.pdf

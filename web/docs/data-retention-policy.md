@@ -1,10 +1,10 @@
 # Data Retention and Disposal Policy
 
-**Application:** AMR Finance — personal finance dashboard
-**Owner:** Anthony Rivera, sole developer and operator
-**Contact:** arivera1995@gmail.com
-**Effective:** 25 July 2026
-**Review cadence:** Annually, and on any change to what data the application stores
+- **Application:** AMR Finance — personal finance dashboard
+- **Owner:** Anthony Rivera, sole developer and operator
+- **Contact:** arivera1995@gmail.com
+- **Effective:** 25 July 2026
+- **Review cadence:** Annually, and on any change to what data the application stores
 
 ---
 

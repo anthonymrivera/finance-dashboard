@@ -1,10 +1,10 @@
 # Information Security Policy
 
-**Application:** AMR Finance — personal finance dashboard
-**Owner:** Anthony Rivera, sole developer and operator
-**Contact:** arivera1995@gmail.com
-**Effective:** 25 July 2026
-**Review cadence:** Annually, and on any material change to the architecture
+- **Application:** AMR Finance — personal finance dashboard
+- **Owner:** Anthony Rivera, sole developer and operator
+- **Contact:** arivera1995@gmail.com
+- **Effective:** 25 July 2026
+- **Review cadence:** Annually, and on any material change to the architecture
 
 ---
 
