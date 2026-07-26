@@ -29,7 +29,7 @@ export async function POST(request: Request) {
     request.headers.get("x-forwarded-for")?.split(",").pop()?.trim() ??
     "unknown";
 
-  const limit = rateLimit(`webhook:${ip}`, 60, 60 * 1000);
+  const limit = await rateLimit(`webhook:${ip}`, 60, 60 * 1000);
   if (!limit.allowed) {
     return NextResponse.json(
       { error: "Too many requests" },

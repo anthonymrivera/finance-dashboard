@@ -14,7 +14,7 @@ export async function POST() {
 
   // Plaid bills per API call and rate-limits its own endpoints; a user leaning on
   // the refresh button should not be able to hammer them.
-  const limit = rateLimit(`sync:${user.id}`, 6, 60 * 1000);
+  const limit = await rateLimit(`sync:${user.id}`, 6, 60 * 1000);
   if (!limit.allowed) {
     return NextResponse.json(
       { error: `Please wait ${limit.retryAfterSeconds}s before refreshing again` },

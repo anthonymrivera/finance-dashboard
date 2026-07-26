@@ -59,7 +59,7 @@ export async function login(_prev: AuthState, formData: FormData): Promise<AuthS
   }
 
   const key = await clientKey("login");
-  const limit = rateLimit(key, 10, 15 * 60 * 1000);
+  const limit = await rateLimit(key, 10, 15 * 60 * 1000);
 
   if (!limit.allowed) {
     return {
@@ -79,7 +79,7 @@ export async function login(_prev: AuthState, formData: FormData): Promise<AuthS
     return { error: "Incorrect email or password" };
   }
 
-  resetRateLimit(key);
+  await resetRateLimit(key);
 
   if (user.totpEnabledAt) {
     await setPendingCookie(user.id);
@@ -100,10 +100,11 @@ export async function verifyTwoFactor(_prev: AuthState, formData: FormData): Pro
   const userId = await readPendingUserId();
   if (!userId) return { error: "That sign-in attempt expired. Start again." };
 
-  // In-memory limiter first (cheap), but it resets on cold start and is not
-  // shared across serverless instances — so the real cap is the persisted
-  // counter below.
-  rateLimit(`2fa:${userId}`, TOTP_MAX_ATTEMPTS, TOTP_LOCKOUT_MS);
+  // Two independent brakes. The shared limiter throttles by identity, and the
+  // per-user counter persisted below survives even a total limiter outage —
+  // which matters most on the one endpoint where a correct guess is worth the
+  // attempt.
+  await rateLimit(`2fa:${userId}`, TOTP_MAX_ATTEMPTS, TOTP_LOCKOUT_MS);
 
   const user = await db.query.users.findFirst({ where: eq(users.id, userId) });
   if (!user?.totpSecretEncrypted || !user.isActive) {
@@ -168,7 +169,7 @@ export async function register(_prev: AuthState, formData: FormData): Promise<Au
   const strength = validatePasswordStrength(parsed.data.password);
   if (!strength.ok) return { error: strength.reason };
 
-  const limit = rateLimit(await clientKey("register"), 5, 60 * 60 * 1000);
+  const limit = await rateLimit(await clientKey("register"), 5, 60 * 60 * 1000);
   if (!limit.allowed) return { error: "Too many sign-up attempts. Try again later." };
 
   const email = parsed.data.email.toLowerCase().trim();

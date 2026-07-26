@@ -93,6 +93,16 @@ const schema = z.object({
    */
   ALLOWED_EMAILS: emptyToUndefined(z.string().min(1)),
 
+  /**
+   * Upstash Redis, for rate limiting shared across serverless instances.
+   *
+   * Optional: without both values the limiter falls back to an in-process Map,
+   * which is fine locally but enforces little on Vercel, where every cold start
+   * begins with an empty one.
+   */
+  UPSTASH_REDIS_REST_URL: emptyToUndefined(z.string().url()),
+  UPSTASH_REDIS_REST_TOKEN: emptyToUndefined(z.string().min(1)),
+
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
 });
 
