@@ -135,7 +135,11 @@ export default async function AccountsPage() {
                           </p>
                         ) : account.creditLimit ? (
                           <p className="mt-0.5 text-[0.75rem] text-[var(--ink-secondary)] tabular">
-                            of {money.display(account.creditLimit)} limit
+                            of{" "}
+                            {money.display(account.creditLimit, {
+                              currency: account.isoCurrencyCode,
+                            })}{" "}
+                            limit
                           </p>
                         ) : null}
                         </div>
@@ -180,7 +184,17 @@ function groupByInstitution(accounts: AccountWithInstitution[]): Group[] {
   const map = new Map<string, Group>();
 
   for (const account of accounts) {
-    const key = account.isManual ? "__manual__" : (account.institutionName ?? "Linked bank");
+    /**
+     * Group by the Plaid item, not by the institution's name.
+     *
+     * Two separate connections to the same bank — a personal and a business
+     * login — share a name but are distinct items with their own tokens and
+     * error states. Keying on the name merged them and took errorCode, itemId,
+     * and lastSyncedAt from whichever account happened to sort first, so a
+     * broken connection could show no warning banner at all while its balances
+     * silently went stale.
+     */
+    const key = account.isManual ? "__manual__" : (account.itemId ?? "unlinked");
 
     let group = map.get(key);
     if (!group) {

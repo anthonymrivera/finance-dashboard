@@ -55,8 +55,18 @@ export default async function DashboardPage() {
   }
 
   const monthSpend = spending.reduce((sum, s) => money.add(sum, s.total), "0");
-  const thisMonth = cashFlow.at(-1);
-  const lastMonth = cashFlow.at(-2);
+
+  // Looked up by month key rather than by position. getCashFlow zero-fills, so
+  // the last two entries *are* this month and last — but that is an invariant of
+  // another module, and comparing the wrong two months would be invisible.
+  const byMonth = new Map(cashFlow.map((m) => [m.month, m]));
+  const now = new Date();
+  const monthKey = (offset: number) => {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - offset, 1));
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+  };
+  const thisMonth = byMonth.get(monthKey(0));
+  const lastMonth = byMonth.get(monthKey(1));
 
   const spendDelta =
     thisMonth && lastMonth && money.toNumber(lastMonth.expenses) > 0
@@ -185,9 +195,18 @@ export default async function DashboardPage() {
   );
 }
 
+/**
+ * First day of the current month, in UTC.
+ *
+ * Built with Date.UTC rather than the local-time constructor: the result is
+ * serialized with toISOString(), which converts to UTC, so a local-time
+ * construction west of Greenwich resolves to the last day of the *previous*
+ * month. Correct today only because Vercel runs UTC — this makes it correct
+ * anywhere.
+ */
 function startOfMonth(): string {
   const now = new Date();
-  return isoDate(new Date(now.getFullYear(), now.getMonth(), 1));
+  return isoDate(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)));
 }
 
 function isoDate(date: Date): string {
