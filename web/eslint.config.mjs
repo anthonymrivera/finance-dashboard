@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Output of `npm run build:check`, which writes outside .next so a
+    // verification build cannot disturb a running dev server. Linting compiled
+    // bundles produces hundreds of meaningless errors and hides real ones.
+    ".next-check/**",
   ]),
 ]);
 

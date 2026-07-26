@@ -10,7 +10,7 @@ import { isEmailAllowed } from "@/lib/env";
 import { hashPassword, validatePasswordStrength, verifyPassword } from "./password";
 import { createSession, destroySession } from "./session";
 import { rateLimit, resetRateLimit } from "./rate-limit";
-import { canRegister, consumeInvite, isFirstRun } from "./invites";
+import { canRegister, consumeInvite } from "./invites";
 import { verifyCodeWithCounter } from "./totp";
 import { decryptSecret } from "./totp-storage";
 import { clearPendingCookie, readPendingUserId, setPendingCookie } from "./pending";
