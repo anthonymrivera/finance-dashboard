@@ -1,0 +1,18 @@
+# Automated dependency update alerts and pull requests.
+#
+# Referenced by docs/information-security-policy.md §5 — the policy states that
+# automated dependency alerts are enabled, so this file is what makes that true.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /web
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # One PR per week for routine updates; security advisories still open
+      # their own PR immediately regardless of grouping.
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
