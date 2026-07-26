@@ -53,7 +53,7 @@
     "eslint-config-next": "^16.2.12",
     "tailwindcss": "^4",
     "tsx": "^4.23.1",
-    "typescript": "^5"
+    "typescript": "^7"
   },
   "overridesReason": {
     "sharp": "Next pins sharp ^0.34.5, which carries high-severity libvips CVEs (GHSA-f88m-g3jw-g9cj). The app never feeds it attacker-controlled input — its only next/image is a self-generated data-URI QR code marked unoptimized — but pinning the patched release keeps the dependency tree clean. Drop this override once Next ships sharp >=0.35."
