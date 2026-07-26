@@ -42,7 +42,9 @@ export async function POST(request: Request) {
   const rawBody = await request.text();
   const verificationHeader = request.headers.get("plaid-verification");
 
-  if (!verificationHeader || !(await verifyWebhook(rawBody, verificationHeader))) {
+  const signedBy = verificationHeader ? await verifyWebhook(rawBody, verificationHeader) : null;
+
+  if (!signedBy) {
     console.warn("[plaid] rejected webhook with invalid or missing signature");
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
@@ -65,6 +67,17 @@ export async function POST(request: Request) {
   // An unknown Item is normal after an unlink — acknowledge rather than error,
   // or Plaid will keep retrying a webhook that can never succeed.
   if (!item) return NextResponse.json({ received: true });
+
+  // The signing environment must match the Item's own. Without this a webhook
+  // signed by sandbox — whose keys are far easier to come by — could drive
+  // activity against a production Item holding real bank data.
+  if (item.environment !== signedBy) {
+    console.warn("[plaid] webhook environment mismatch", {
+      signedBy,
+      itemEnvironment: item.environment,
+    });
+    return NextResponse.json({ error: "Environment mismatch" }, { status: 401 });
+  }
 
   try {
     if (type === "TRANSACTIONS") {

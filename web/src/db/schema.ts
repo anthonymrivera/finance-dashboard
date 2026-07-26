@@ -144,6 +144,16 @@ export const plaidItems = pgTable(
     /** AES-256-GCM envelope from lib/crypto.ts. Never logged, never sent to the client. */
     accessTokenEncrypted: text("access_token_encrypted").notNull(),
 
+    /**
+     * Which Plaid environment issued this token: sandbox | production.
+     *
+     * A token only works against the environment that minted it, and this app
+     * runs both at once — real accounts in production, the demo account in
+     * sandbox — so every API call has to be routed by this value rather than by
+     * a global setting.
+     */
+    environment: text("environment").notNull().default("sandbox"),
+
     institutionId: text("institution_id"),
     institutionName: text("institution_name"),
 

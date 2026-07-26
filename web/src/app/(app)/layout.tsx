@@ -1,14 +1,32 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
+import { isDemoEmail } from "@/lib/env";
 import { logout } from "@/lib/auth/actions";
 import { Nav } from "@/components/nav";
 import { SyncButton } from "@/components/sync-button";
+
+/**
+ * Marks a demo session so nobody — including you, mid-demo — mistakes generated
+ * sandbox figures for real ones.
+ */
+function DemoBadge() {
+  return (
+    <span
+      title="Sandbox data — not real accounts"
+      className="rounded-full bg-[var(--color-series-3)]/15 px-2 py-0.5 text-[0.625rem] font-semibold tracking-wide text-[var(--ink-secondary)] uppercase"
+    >
+      Demo
+    </span>
+  );
+}
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   // Every page in this group is behind the same check, enforced once here
   // rather than repeated (and eventually forgotten) in each page.
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+
+  const isDemo = isDemoEmail(user.email);
 
   return (
     <div className="flex min-h-dvh">
@@ -22,6 +40,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             $
           </div>
           <span className="text-[0.9375rem] font-semibold tracking-tight">Finance</span>
+          {isDemo ? <DemoBadge /> : null}
         </div>
 
         <Nav />
@@ -52,6 +71,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               $
             </div>
             <span className="text-sm font-semibold">Finance</span>
+            {isDemo ? <DemoBadge /> : null}
           </div>
           <SyncButton compact />
         </header>

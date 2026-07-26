@@ -23,9 +23,35 @@ const schema = z.object({
       message: "ENCRYPTION_KEY must be exactly 32 bytes, base64-encoded (openssl rand -base64 32)",
     }),
 
+  /** Same value across every Plaid environment. */
   PLAID_CLIENT_ID: z.string().min(1),
-  PLAID_SECRET: z.string().min(1),
+
+  /**
+   * Plaid secrets are environment-specific, and this app talks to both at once:
+   * real accounts against production, the demo account against sandbox. Holding
+   * a single secret would make that impossible.
+   */
+  PLAID_SANDBOX_SECRET: z.string().min(1),
+  PLAID_PRODUCTION_SECRET: emptyToUndefined(z.string().min(1)),
+
+  /** Environment used by ordinary accounts. Demo accounts are always sandbox. */
   PLAID_ENV: z.enum(["sandbox", "production"]).default("sandbox"),
+
+  /**
+   * Addresses pinned to Plaid Sandbox no matter what PLAID_ENV says,
+   * comma-separated.
+   *
+   * This is what makes a demo account safe to show people once the app is live
+   * in production: anything linked from it can only ever be a fake sandbox
+   * institution. Without the pin, clicking "Link an account" while signed into
+   * the demo would connect a real bank to the real Plaid account — consuming a
+   * production Item and pulling genuine financial data into a login meant for
+   * demonstrations.
+   *
+   * Deployment config rather than a database flag, deliberately: no application
+   * bug can promote a demo account to production.
+   */
+  DEMO_EMAILS: emptyToUndefined(z.string().min(1)),
 
   /** Public origin, e.g. https://finance.example.com. Used for Plaid redirect + webhook URIs. */
   APP_URL: z.string().url().default("http://localhost:3000"),
@@ -94,4 +120,36 @@ export const allowlistActive = allowedEmails !== null;
 export function isEmailAllowed(email: string): boolean {
   if (!allowedEmails) return true;
   return allowedEmails.has(email.trim().toLowerCase());
+}
+
+const demoEmails = new Set(
+  (env.DEMO_EMAILS ?? "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean),
+);
+
+export type PlaidEnv = "sandbox" | "production";
+
+/** True for accounts that exist to be shown to other people. */
+export function isDemoEmail(email: string): boolean {
+  return demoEmails.has(email.trim().toLowerCase());
+}
+
+/**
+ * Which Plaid environment this account operates in.
+ *
+ * Demo accounts are hard-pinned to sandbox; everyone else follows PLAID_ENV.
+ */
+export function plaidEnvFor(email: string): PlaidEnv {
+  return isDemoEmail(email) ? "sandbox" : env.PLAID_ENV;
+}
+
+// Fail at boot rather than at link time: a production deployment missing its
+// production secret is a misconfiguration, not a runtime condition to handle.
+if (env.PLAID_ENV === "production" && !env.PLAID_PRODUCTION_SECRET) {
+  throw new Error(
+    "PLAID_ENV is 'production' but PLAID_PRODUCTION_SECRET is not set.\n" +
+      "Add the production secret from dashboard.plaid.com → Developers → Keys.",
+  );
 }

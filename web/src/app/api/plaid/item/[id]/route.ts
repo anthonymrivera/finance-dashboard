@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { plaidItems } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth/session";
 import { decrypt } from "@/lib/crypto";
+import type { PlaidEnv } from "@/lib/env";
 import { removeItem } from "@/lib/plaid/client";
 import { describePlaidError } from "@/lib/plaid/errors";
 
@@ -29,7 +30,8 @@ export async function DELETE(_request: Request, context: { params: Promise<{ id:
   if (!item) return NextResponse.json({ error: "Connection not found" }, { status: 404 });
 
   try {
-    await removeItem(decrypt(item.accessTokenEncrypted));
+    // Revoke against the environment that issued the token.
+    await removeItem(decrypt(item.accessTokenEncrypted), item.environment as PlaidEnv);
   } catch (error) {
     // If Plaid already dropped the Item, local cleanup should still proceed;
     // otherwise the row is unremovable through the UI forever.

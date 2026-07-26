@@ -15,6 +15,13 @@
       "when": 1785015744170,
       "tag": "0001_crazy_spot",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785026298961,
+      "tag": "0002_sparkling_vin_gonzales",
+      "breakpoints": true
     }
   ]
 }

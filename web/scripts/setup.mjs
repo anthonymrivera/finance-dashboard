@@ -140,7 +140,7 @@ DATABASE_URL="${databaseUrl}"
 ENCRYPTION_KEY="${encryptionKey}"
 
 PLAID_CLIENT_ID="${plaidClientId}"
-PLAID_SECRET="${plaidSecret}"
+PLAID_SANDBOX_SECRET="${plaidSecret}"
 PLAID_ENV="sandbox"
 
 APP_URL="http://localhost:3000"

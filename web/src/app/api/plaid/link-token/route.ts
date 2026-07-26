@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { plaidItems } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth/session";
 import { decrypt } from "@/lib/crypto";
+import { plaidEnvFor, type PlaidEnv } from "@/lib/env";
 import { createLinkToken, createUpdateModeLinkToken } from "@/lib/plaid/client";
 import { describePlaidError } from "@/lib/plaid/errors";
 
@@ -31,11 +32,23 @@ export async function POST(request: Request) {
 
       if (!item) return NextResponse.json({ error: "Connection not found" }, { status: 404 });
 
-      const linkToken = await createUpdateModeLinkToken(user.id, decrypt(item.accessTokenEncrypted));
+      // Update mode must target the environment that issued the existing token.
+      const linkToken = await createUpdateModeLinkToken(
+        user.id,
+        decrypt(item.accessTokenEncrypted),
+        item.environment as PlaidEnv,
+      );
       return NextResponse.json({ linkToken });
     }
 
-    return NextResponse.json({ linkToken: await createLinkToken(user.id) });
+    // A demo account is pinned to sandbox, so anything linked from it can only
+    // ever be a fake institution — even when the app is live in production.
+    const environment = plaidEnvFor(user.email);
+
+    return NextResponse.json({
+      linkToken: await createLinkToken(user.id, environment),
+      environment,
+    });
   } catch (error) {
     console.error("[plaid] link token creation failed", describePlaidError(error));
     return NextResponse.json({ error: "Could not start bank connection" }, { status: 502 });

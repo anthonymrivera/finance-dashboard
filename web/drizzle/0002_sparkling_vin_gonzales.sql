@@ -1,0 +1,1 @@
+ALTER TABLE "plaid_items" ADD COLUMN "environment" text DEFAULT 'sandbox' NOT NULL;

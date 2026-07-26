@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { plaidItems } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth/session";
 import { encrypt } from "@/lib/crypto";
+import { plaidEnvFor } from "@/lib/env";
 import { and, eq } from "drizzle-orm";
 import { exchangePublicToken, getInstitution, removeItem } from "@/lib/plaid/client";
 import { describePlaidError } from "@/lib/plaid/errors";
@@ -31,8 +32,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 
+  // Derived from the signed-in account, never from the request body — otherwise
+  // a demo session could opt itself into production by sending a flag.
+  const environment = plaidEnvFor(user.email);
+
   try {
-    const { accessToken, itemId } = await exchangePublicToken(parsed.data.publicToken);
+    const { accessToken, itemId } = await exchangePublicToken(
+      parsed.data.publicToken,
+      environment,
+    );
 
     /**
      * Refuse a second connection to an institution this user already linked.
@@ -58,7 +66,7 @@ export async function POST(request: Request) {
       if (existing) {
         // Revoke the token just minted, or it lingers as an orphaned — and
         // billable — Item on the Plaid side.
-        await removeItem(accessToken).catch(() => {});
+        await removeItem(accessToken, environment).catch(() => {});
 
         return NextResponse.json(
           {
@@ -71,7 +79,7 @@ export async function POST(request: Request) {
     }
 
     const institution = parsed.data.institutionId
-      ? await getInstitution(parsed.data.institutionId)
+      ? await getInstitution(parsed.data.institutionId, environment)
       : null;
 
     const [item] = await db
@@ -80,6 +88,7 @@ export async function POST(request: Request) {
         userId: user.id,
         plaidItemId: itemId,
         accessTokenEncrypted: encrypt(accessToken),
+        environment,
         institutionId: parsed.data.institutionId ?? null,
         institutionName: institution?.name ?? null,
       })

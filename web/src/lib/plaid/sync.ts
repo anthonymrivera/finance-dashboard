@@ -10,7 +10,8 @@ import {
   type NewTransaction,
 } from "@/db/schema";
 import { decrypt } from "@/lib/crypto";
-import { plaid } from "./client";
+import type { PlaidEnv } from "@/lib/env";
+import { plaidFor } from "./client";
 import { plaidErrorCode } from "./errors";
 
 /**
@@ -78,14 +79,22 @@ export async function syncItem(itemId: string): Promise<SyncResult> {
     // and take down every other institution's sync with it.
     const accessToken = decrypt(item.accessTokenEncrypted);
 
-    const accountsUpdated = await syncAccounts(item.id, item.userId, accessToken);
-    const txResult = await syncTransactions(item.id, item.userId, accessToken, item.transactionCursor);
+    const environment = item.environment as PlaidEnv;
+
+    const accountsUpdated = await syncAccounts(item.id, item.userId, accessToken, environment);
+    const txResult = await syncTransactions(
+      item.id,
+      item.userId,
+      accessToken,
+      item.transactionCursor,
+      environment,
+    );
 
     // Investments and liabilities are optional per institution. A bank with
     // neither is normal, so these run independently and never fail the sync.
     const [holdingCount, liabilityCount] = await Promise.all([
-      syncHoldings(item.id, item.userId, accessToken).catch(absentProduct),
-      syncLiabilities(item.id, item.userId, accessToken).catch(absentProduct),
+      syncHoldings(item.id, item.userId, accessToken, environment).catch(absentProduct),
+      syncLiabilities(item.id, item.userId, accessToken, environment).catch(absentProduct),
     ]);
 
     await db
@@ -132,8 +141,13 @@ function absentProduct(error: unknown): number {
 }
 
 
-async function syncAccounts(itemId: string, userId: string, accessToken: string): Promise<number> {
-  const { data } = await plaid.accountsGet({ access_token: accessToken });
+async function syncAccounts(
+  itemId: string,
+  userId: string,
+  accessToken: string,
+  environment: PlaidEnv,
+): Promise<number> {
+  const { data } = await plaidFor(environment).accountsGet({ access_token: accessToken });
 
   for (const account of data.accounts) {
     const liability = isLiabilityType(account.type);
@@ -179,6 +193,7 @@ async function syncTransactions(
   userId: string,
   accessToken: string,
   startCursor: string | null,
+  environment: PlaidEnv,
 ): Promise<{ added: number; modified: number; removed: number }> {
   // Map Plaid's account ids onto our own primary keys once, rather than
   // querying per transaction.
@@ -189,7 +204,7 @@ async function syncTransactions(
   const counts = { added: 0, modified: 0, removed: 0 };
 
   while (hasMore) {
-    const { data } = await plaid.transactionsSync({
+    const { data } = await plaidFor(environment).transactionsSync({
       access_token: accessToken,
       cursor,
       count: 500,
@@ -298,8 +313,13 @@ function sqlExcluded(column: string) {
  * per Item means an institution reporting only some accounts cannot wipe the
  * rest.
  */
-async function syncHoldings(itemId: string, userId: string, accessToken: string): Promise<number> {
-  const { data } = await plaid.investmentsHoldingsGet({ access_token: accessToken });
+async function syncHoldings(
+  itemId: string,
+  userId: string,
+  accessToken: string,
+  environment: PlaidEnv,
+): Promise<number> {
+  const { data } = await plaidFor(environment).investmentsHoldingsGet({ access_token: accessToken });
 
   const accountIdByPlaidId = await mapAccountIds(itemId);
   const securities = new Map(data.securities.map((s) => [s.security_id, s]));
@@ -403,8 +423,9 @@ async function syncLiabilities(
   itemId: string,
   userId: string,
   accessToken: string,
+  environment: PlaidEnv,
 ): Promise<number> {
-  const { data } = await plaid.liabilitiesGet({ access_token: accessToken });
+  const { data } = await plaidFor(environment).liabilitiesGet({ access_token: accessToken });
 
   const accountIdByPlaidId = await mapAccountIds(itemId);
   const rows: LiabilityRow[] = [];
