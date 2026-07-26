@@ -48,6 +48,17 @@ const nextConfig: NextConfig = {
   poweredByHeader: false, // don't advertise the framework
 
   /**
+   * Lets a verification build write somewhere other than `.next`.
+   *
+   * `next build` and `next dev` share that directory by default, so building
+   * while a dev server is running overwrites its Server Action manifest — the
+   * dev server then rejects actions the browser legitimately holds, with a
+   * confusing "Server Action was not found" on the next submit. `npm run
+   * build:check` isolates the two.
+   */
+  distDir: process.env.BUILD_DIR || ".next",
+
+  /**
    * Version skew protection.
    *
    * A page rendered by one deployment embeds Server Action ids from that build.
