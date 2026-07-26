@@ -47,6 +47,21 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   poweredByHeader: false, // don't advertise the framework
 
+  /**
+   * Version skew protection.
+   *
+   * A page rendered by one deployment embeds Server Action ids from that build.
+   * After a redeploy those ids no longer exist, so any still-open tab fails with
+   * "Server Action was not found on the server" the next time the user submits
+   * anything — signing out, linking a bank, saving a setting.
+   *
+   * With a deployment id set, Next stamps assets and navigation requests with it
+   * and forces a full reload when the client and server disagree, instead of
+   * failing. Vercel injects VERCEL_DEPLOYMENT_ID at build time; elsewhere this
+   * is simply undefined and the behaviour is unchanged.
+   */
+  deploymentId: process.env.VERCEL_DEPLOYMENT_ID,
+
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
