@@ -8,7 +8,14 @@ import { describePlaidError } from "@/lib/plaid/errors";
 import { pruneExpiredSessions, safeEqual } from "@/lib/auth/session";
 
 export const runtime = "nodejs";
-export const maxDuration = 300;
+
+/**
+ * 60s is the ceiling on Vercel's Hobby plan — asking for more fails the build
+ * rather than degrading. Ample here: the job syncs a handful of Items per user
+ * and writes one snapshot row each. If this ever times out, move the per-user
+ * work to a queue rather than raising the number.
+ */
+export const maxDuration = 60;
 
 /**
  * Daily maintenance, run by Vercel Cron (see vercel.json).

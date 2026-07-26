@@ -2,7 +2,6 @@
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { randomBytes } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
@@ -202,9 +201,19 @@ export async function logout(): Promise<void> {
   redirect("/login");
 }
 
-export { isFirstRun };
-
-/** Random, URL-safe, and unguessable — for anywhere a one-off token is needed. */
-export async function generateToken(): Promise<string> {
-  return randomBytes(32).toString("base64url");
-}
+/*
+ * Nothing else is exported from this module on purpose.
+ *
+ * Every export of a "use server" file becomes a publicly callable endpoint, and
+ * must be an async function declared here. Two exports previously broke that:
+ *
+ *   export { isFirstRun }   re-exported a function whose body lives in
+ *                           invites.ts, a plain module. Next could not register
+ *                           it properly, which left the action manifest for this
+ *                           whole file inconsistent — so even `logout` failed to
+ *                           resolve. It was also redundant: login/page.tsx
+ *                           already imports isFirstRun from invites.ts directly.
+ *
+ *   generateToken()         unused, and exporting it published a random-token
+ *                           generator as an endpoint anyone could POST to.
+ */
