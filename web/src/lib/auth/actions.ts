@@ -1,18 +1,20 @@
 "use server";
 
-import { cookies, headers } from "next/headers";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { users } from "@/db/schema";
-import { env, isProd, isEmailAllowed } from "@/lib/env";
+import { isEmailAllowed } from "@/lib/env";
 import { hashPassword, validatePasswordStrength, verifyPassword } from "./password";
 import { createSession, destroySession } from "./session";
 import { rateLimit, resetRateLimit } from "./rate-limit";
 import { canRegister, consumeInvite, isFirstRun } from "./invites";
-import { decryptSecret, verifyCode } from "./totp";
+import { verifyCodeWithCounter } from "./totp";
+import { decryptSecret } from "./totp-storage";
+import { clearPendingCookie, readPendingUserId, setPendingCookie } from "./pending";
 
 export type AuthState = { error?: string } | undefined;
 
@@ -23,7 +25,16 @@ const credentialsSchema = z.object({
 
 async function clientKey(prefix: string): Promise<string> {
   const h = await headers();
-  const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+
+  // Prefer the platform header, which the edge sets and a client cannot forge.
+  // Falling back to the *rightmost* X-Forwarded-For entry rather than the
+  // leftmost: the left is client-supplied on most infrastructure, so keying on
+  // it would let an attacker sidestep the limit by varying one header.
+  const ip =
+    h.get("x-vercel-forwarded-for") ??
+    h.get("x-forwarded-for")?.split(",").pop()?.trim() ??
+    "unknown";
+
   return `${prefix}:${ip}`;
 }
 
@@ -35,55 +46,6 @@ async function clientKey(prefix: string): Promise<string> {
  */
 const DUMMY_HASH =
   "$argon2id$v=19$m=19456,t=2,p=1$YWJjZGVmZ2hpamtsbW5vcA$c2FtcGxlZHVtbXloYXNodmFsdWVub3RyZWFs";
-
-// ─── Two-factor interstitial ─────────────────────────────────────────────────
-
-const PENDING_COOKIE = "fd_2fa_pending";
-const PENDING_TTL_MS = 5 * 60 * 1000;
-
-/**
- * Between a correct password and a correct TOTP code the user is authenticated
- * but not yet logged in. That state lives in a short-lived HMAC-signed cookie
- * rather than a real session, so possessing it grants nothing on its own.
- */
-function signPending(userId: string, expiresAt: number): string {
-  const payload = `${userId}.${expiresAt}`;
-  const mac = createHmac("sha256", env.ENCRYPTION_KEY).update(payload).digest("base64url");
-  return `${payload}.${mac}`;
-}
-
-function verifyPending(token: string): string | null {
-  const parts = token.split(".");
-  if (parts.length !== 3) return null;
-
-  const [userId, expiresAtRaw, mac] = parts;
-  const expected = createHmac("sha256", env.ENCRYPTION_KEY)
-    .update(`${userId}.${expiresAtRaw}`)
-    .digest("base64url");
-
-  const a = Buffer.from(mac);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
-
-  if (Number(expiresAtRaw) < Date.now()) return null;
-
-  return userId;
-}
-
-async function startTwoFactor(userId: string): Promise<never> {
-  const expiresAt = Date.now() + PENDING_TTL_MS;
-
-  const store = await cookies();
-  store.set(PENDING_COOKIE, signPending(userId, expiresAt), {
-    httpOnly: true,
-    secure: isProd,
-    sameSite: "lax",
-    path: "/",
-    maxAge: PENDING_TTL_MS / 1000,
-  });
-
-  redirect("/login/verify");
-}
 
 // ─── Actions ─────────────────────────────────────────────────────────────────
 
@@ -120,7 +82,10 @@ export async function login(_prev: AuthState, formData: FormData): Promise<AuthS
 
   resetRateLimit(key);
 
-  if (user.totpEnabledAt) await startTwoFactor(user.id);
+  if (user.totpEnabledAt) {
+    await setPendingCookie(user.id);
+    redirect("/login/verify");
+  }
 
   await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id));
   await createSession(user.id);
@@ -128,29 +93,64 @@ export async function login(_prev: AuthState, formData: FormData): Promise<AuthS
   redirect("/dashboard");
 }
 
-export async function verifyTwoFactor(_prev: AuthState, formData: FormData): Promise<AuthState> {
-  const store = await cookies();
-  const token = store.get(PENDING_COOKIE)?.value;
+/** Attempts allowed against the second factor before the account locks briefly. */
+const TOTP_MAX_ATTEMPTS = 8;
+const TOTP_LOCKOUT_MS = 15 * 60 * 1000;
 
-  const userId = token ? verifyPending(token) : null;
+export async function verifyTwoFactor(_prev: AuthState, formData: FormData): Promise<AuthState> {
+  const userId = await readPendingUserId();
   if (!userId) return { error: "That sign-in attempt expired. Start again." };
 
-  const limit = rateLimit(`2fa:${userId}`, 8, 15 * 60 * 1000);
-  if (!limit.allowed) return { error: "Too many attempts. Try again shortly." };
+  // In-memory limiter first (cheap), but it resets on cold start and is not
+  // shared across serverless instances — so the real cap is the persisted
+  // counter below.
+  rateLimit(`2fa:${userId}`, TOTP_MAX_ATTEMPTS, TOTP_LOCKOUT_MS);
 
   const user = await db.query.users.findFirst({ where: eq(users.id, userId) });
   if (!user?.totpSecretEncrypted || !user.isActive) {
     return { error: "That sign-in attempt expired. Start again." };
   }
 
+  if (user.totpLockedUntil && user.totpLockedUntil.getTime() > Date.now()) {
+    const minutes = Math.ceil((user.totpLockedUntil.getTime() - Date.now()) / 60000);
+    return { error: `Too many incorrect codes. Try again in ${minutes} minute(s).` };
+  }
+
   const code = String(formData.get("code") ?? "");
-  if (!verifyCode(decryptSecret(user.totpSecretEncrypted), code)) {
+  const result = verifyCodeWithCounter(
+    decryptSecret(user.totpSecretEncrypted),
+    code,
+    user.totpLastUsedCounter,
+  );
+
+  if (!result.ok) {
+    const attempts = user.totpFailedAttempts + 1;
+
+    await db
+      .update(users)
+      .set({
+        totpFailedAttempts: attempts,
+        totpLockedUntil:
+          attempts >= TOTP_MAX_ATTEMPTS ? new Date(Date.now() + TOTP_LOCKOUT_MS) : null,
+      })
+      .where(eq(users.id, user.id));
+
     return { error: "That code is not valid. Check your authenticator app." };
   }
 
-  store.delete(PENDING_COOKIE);
+  await clearPendingCookie();
 
-  await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id));
+  await db
+    .update(users)
+    .set({
+      lastLoginAt: new Date(),
+      // Burn this time step so the same code cannot be replayed.
+      totpLastUsedCounter: result.counter,
+      totpFailedAttempts: 0,
+      totpLockedUntil: null,
+    })
+    .where(eq(users.id, user.id));
+
   await createSession(user.id);
 
   redirect("/dashboard");

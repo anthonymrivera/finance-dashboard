@@ -26,13 +26,14 @@
     "drizzle-orm": "^0.45.2",
     "jose": "^6.2.3",
     "lucide-react": "^1.25.0",
-    "next": "16.2.10",
+    "next": "^16.2.12",
     "plaid": "^43.0.0",
     "qrcode": "^1.5.4",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-plaid-link": "^4.1.1",
     "recharts": "^3.9.2",
+    "server-only": "^0.0.1",
     "tailwind-merge": "^3.6.0",
     "ws": "^8.21.1",
     "zod": "^4.4.3"
@@ -47,9 +48,16 @@
     "dotenv": "^17.4.2",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",
-    "eslint-config-next": "16.2.10",
+    "eslint-config-next": "^16.2.12",
     "tailwindcss": "^4",
     "tsx": "^4.23.1",
     "typescript": "^5"
+  },
+  "overridesReason": {
+    "sharp": "Next pins sharp ^0.34.5, which carries high-severity libvips CVEs (GHSA-f88m-g3jw-g9cj). The app never feeds it attacker-controlled input — its only next/image is a self-generated data-URI QR code marked unoptimized — but pinning the patched release keeps the dependency tree clean. Drop this override once Next ships sharp >=0.35."
+  },
+  "overrides": {
+    "sharp": "^0.35.3",
+    "postcss": "^8.5.23"
   }
 }

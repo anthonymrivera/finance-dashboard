@@ -52,6 +52,27 @@ export const users = pgTable(
     /** Set only once a first code has been verified, so a half-finished enrolment never locks anyone out. */
     totpEnabledAt: timestamp("totp_enabled_at", { withTimezone: true }),
 
+    /**
+     * Enrolment in progress. Kept apart from the live secret so starting a new
+     * setup cannot overwrite — or silently disable — a factor that is already
+     * protecting the account.
+     */
+    totpSecretPendingEncrypted: text("totp_secret_pending_encrypted"),
+
+    /**
+     * Highest TOTP time step already accepted. Codes at or below it are refused,
+     * making each code single-use rather than valid for its whole window.
+     */
+    totpLastUsedCounter: integer("totp_last_used_counter"),
+
+    /**
+     * Persisted failure counter for the 2FA step. The in-memory limiter resets
+     * on every cold start and is not shared between serverless instances, so the
+     * attempt cap has to live in the database to mean anything.
+     */
+    totpFailedAttempts: integer("totp_failed_attempts").notNull().default(0),
+    totpLockedUntil: timestamp("totp_locked_until", { withTimezone: true }),
+
     isActive: boolean("is_active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     lastLoginAt: timestamp("last_login_at", { withTimezone: true }),

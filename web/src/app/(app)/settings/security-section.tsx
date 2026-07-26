@@ -26,8 +26,11 @@ function Submit({ label, variant = "primary" }: { label: string; variant?: "prim
   );
 }
 
+type ActiveSetup = { secretBase32: string; qrDataUri: string };
+
 export function SecuritySection({ enabled }: { enabled: boolean }) {
-  const [setup, setSetup] = useState<TotpSetup | null>(null);
+  const [setup, setSetup] = useState<ActiveSetup | null>(null);
+  const [setupError, setSetupError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
 
   const [confirmState, confirmAction] = useActionState<SettingsState, FormData>(
@@ -39,10 +42,13 @@ export function SecuritySection({ enabled }: { enabled: boolean }) {
     undefined,
   );
 
-  async function start() {
+  async function start(formData?: FormData) {
     setStarting(true);
+    setSetupError(null);
     try {
-      setSetup(await beginTotpSetup());
+      const result: TotpSetup = await beginTotpSetup(formData);
+      if ("error" in result) setSetupError(result.error);
+      else setSetup(result);
     } finally {
       setStarting(false);
     }
@@ -75,6 +81,35 @@ export function SecuritySection({ enabled }: { enabled: boolean }) {
         </form>
 
         <Feedback state={disableState} />
+
+        {/* Re-enrolling a new device also needs a current code — the server
+            enforces it, so the form collects one rather than failing after. */}
+        <form action={start} className="flex flex-wrap items-end gap-3 border-t pt-4">
+          <div>
+            <label htmlFor="reenrol-code" className="mb-1.5 block text-[0.8125rem] font-medium">
+              Moving to a new phone? Enter a current code
+            </label>
+            <input
+              id="reenrol-code"
+              name="code"
+              inputMode="numeric"
+              maxLength={6}
+              required
+              placeholder="000000"
+              className={CODE_FIELD}
+            />
+          </div>
+          <Button type="submit" variant="secondary" size="sm" loading={starting}>
+            Set up a new device
+          </Button>
+        </form>
+
+        {setupError ? (
+          <p role="alert" className="text-[0.8125rem] text-[var(--negative)]">
+            {setupError}
+          </p>
+        ) : null}
+
         <SignOutEverywhere />
       </div>
     );
@@ -103,9 +138,14 @@ export function SecuritySection({ enabled }: { enabled: boolean }) {
           A password alone is thin protection for a view of every account you own. With
           two-factor on, someone who learns your password still cannot get in.
         </p>
-        <Button variant="primary" size="sm" onClick={start} loading={starting}>
+        <Button variant="primary" size="sm" onClick={() => start()} loading={starting}>
           Set up two-factor
         </Button>
+        {setupError ? (
+          <p role="alert" className="text-[0.8125rem] text-[var(--negative)]">
+            {setupError}
+          </p>
+        ) : null}
         <SignOutEverywhere />
       </div>
     );

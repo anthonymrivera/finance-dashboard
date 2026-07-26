@@ -161,7 +161,11 @@ export async function getTransactions(
       .innerJoin(accounts, eq(transactions.accountId, accounts.id))
       .leftJoin(plaidItems, eq(accounts.plaidItemId, plaidItems.id))
       .where(where)
-      .orderBy(desc(transactions.date), desc(transactions.createdAt))
+      // `id` breaks ties. Rows inserted by one statement share an identical
+      // createdAt (Postgres now() is per-transaction), so without a unique final
+      // key the sort is not a total order and LIMIT/OFFSET paging can repeat a
+      // row on one page while dropping another entirely.
+      .orderBy(desc(transactions.date), desc(transactions.createdAt), desc(transactions.id))
       .limit(limit)
       .offset(offset),
 
@@ -179,6 +183,43 @@ export type CategorySpend = {
   total: string;
   count: number;
 };
+
+/**
+ * Money moving between accounts you own is not income and not spending.
+ *
+ * Without this, paying a linked credit card from a linked checking account is
+ * counted twice: the checking leg as spending, and the card leg as income. The
+ * same happens on every checking→savings transfer. Anyone with more than one
+ * linked account — the entire point of this app — would see inflated totals on
+ * both sides.
+ *
+ * LOAN_PAYMENTS is included because a card or loan payment is debt service, not
+ * consumption; the original purchases were already counted as spending when they
+ * were made. The trade-off: payments toward a loan that is *not* linked here are
+ * also excluded, so spending is understated for unlinked debt. That is the same
+ * call the mainstream finance apps make.
+ */
+const TRANSFER_CATEGORIES = ["TRANSFER_IN", "TRANSFER_OUT", "LOAN_PAYMENTS"] as const;
+
+/** Effective category — the user's override wins over Plaid's. */
+const effectiveCategory = sql`COALESCE(${transactions.userCategory}, ${transactions.category})`;
+
+const notATransfer = sql`(${effectiveCategory} IS NULL OR ${effectiveCategory} <> ALL(ARRAY[${sql.join(
+  TRANSFER_CATEGORIES.map((c) => sql`${c}`),
+  sql`, `,
+)}]::text[]))`;
+
+/**
+ * Exclude transactions belonging to a hidden account.
+ *
+ * Hiding an account removes it from net worth, so leaving its transactions in
+ * the spending and cash-flow totals would make two figures on the same screen
+ * disagree about the same account.
+ */
+const accountNotHidden = sql`EXISTS (
+  SELECT 1 FROM ${accounts}
+  WHERE ${accounts.id} = ${transactions.accountId} AND ${accounts.isHidden} = false
+)`;
 
 /**
  * Spending only — inflows are excluded, otherwise a paycheck swamps every
@@ -204,6 +245,8 @@ export async function getSpendingByCategory(
         lte(transactions.date, to),
         sql`${transactions.amount} < 0`,
         eq(transactions.pending, false),
+        notATransfer,
+        accountNotHidden,
       ),
     )
     .groupBy(sql`COALESCE(${transactions.userCategory}, ${transactions.category}, 'UNCATEGORIZED')`)
@@ -230,14 +273,39 @@ export async function getCashFlow(userId: string, months = 6): Promise<MonthlyFl
     .where(
       and(
         eq(transactions.userId, userId),
-        gte(transactions.date, sql`(CURRENT_DATE - (${months} || ' months')::interval)`),
+        // Anchor to the start of the month, not "N months before today".
+        // Subtracting a raw interval lands mid-month, so the oldest bucket held
+        // only a few days and the chart rendered N+1 bars — the first a stub.
+        gte(
+          transactions.date,
+          sql`(DATE_TRUNC('month', CURRENT_DATE) - ((${months} - 1) || ' months')::interval)`,
+        ),
         eq(transactions.pending, false),
+        notATransfer,
+        accountNotHidden,
       ),
     )
     .groupBy(sql`DATE_TRUNC('month', ${transactions.date})`)
     .orderBy(sql`DATE_TRUNC('month', ${transactions.date})`);
 
-  return rows.map((r) => ({ ...r, net: money.subtract(r.income, r.expenses) }));
+  const byMonth = new Map(rows.map((r) => [r.month, r]));
+
+  // Zero-fill missing months. A month with no transactions must still occupy a
+  // slot, or callers indexing by position compare the wrong periods.
+  const filled: MonthlyFlow[] = [];
+  const now = new Date();
+
+  for (let i = months - 1; i >= 0; i--) {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+    const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+    const row = byMonth.get(key);
+
+    const income = row?.income ?? "0";
+    const expenses = row?.expenses ?? "0";
+    filled.push({ month: key, income, expenses, net: money.subtract(income, expenses) });
+  }
+
+  return filled;
 }
 
 export type TopMerchant = { merchant: string; total: string; count: number };
@@ -261,6 +329,8 @@ export async function getTopMerchants(
         gte(transactions.date, from),
         lte(transactions.date, to),
         sql`${transactions.amount} < 0`,
+        notATransfer,
+        accountNotHidden,
       ),
     )
     .groupBy(sql`COALESCE(${transactions.merchantName}, ${transactions.name})`)

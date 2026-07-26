@@ -4,6 +4,7 @@ import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { recordSnapshot } from "@/lib/queries";
 import { syncAllForUser } from "@/lib/plaid/sync";
+import { describePlaidError } from "@/lib/plaid/errors";
 import { pruneExpiredSessions, safeEqual } from "@/lib/auth/session";
 
 export const runtime = "nodejs";
@@ -44,7 +45,10 @@ export async function GET(request: Request) {
       results.push({ userId: user.id, ok: true });
     } catch (error) {
       // One user's broken bank connection must not stop everyone else's snapshot.
-      console.error("[cron] snapshot failed", { userId: user.id, error });
+      console.error("[cron] snapshot failed", {
+        userId: user.id,
+        error: describePlaidError(error),
+      });
       results.push({ userId: user.id, ok: false });
     }
   }

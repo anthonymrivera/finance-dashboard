@@ -1,5 +1,6 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { cache } from "react";
 import { eq, lt } from "drizzle-orm";
 import { db } from "@/db";
@@ -83,18 +84,20 @@ export const getCurrentUser = cache(async (): Promise<User | null> => {
   return row.user;
 });
 
-/** For routes and actions where absence of a user is a programming error. */
+/**
+ * Resolve the current user or send them to sign in.
+ *
+ * Redirects rather than throws. Throwing logged a stack trace on every
+ * unauthenticated request — an expired session is routine, not exceptional, and
+ * the noise would bury genuine errors in the production logs. Redirect also
+ * gives the better outcome in both contexts: a server component renders the
+ * login page, and a stale server action bounces the user there instead of
+ * failing silently behind a dead form.
+ */
 export async function requireUser(): Promise<User> {
   const user = await getCurrentUser();
-  if (!user) throw new UnauthorizedError();
+  if (!user) redirect("/login");
   return user;
-}
-
-export class UnauthorizedError extends Error {
-  constructor() {
-    super("Not authenticated");
-    this.name = "UnauthorizedError";
-  }
 }
 
 export async function destroySession(): Promise<void> {

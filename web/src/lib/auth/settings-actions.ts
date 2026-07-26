@@ -8,14 +8,8 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { requireUser, destroyAllSessions, createSession } from "./session";
 import { createInvite, revokeInvite } from "./invites";
-import {
-  decryptSecret,
-  encryptSecret,
-  encodeSecret,
-  generateSecret,
-  keyUri,
-  verifyCode,
-} from "./totp";
+import { encodeSecret, generateSecret, keyUri, verifyCodeWithCounter } from "./totp";
+import { decryptSecret, encryptSecret } from "./totp-storage";
 
 export type SettingsState = { error?: string; success?: string } | undefined;
 
@@ -50,22 +44,43 @@ export async function revokeUserInvite(email: string): Promise<SettingsState> {
 
 // ─── Two-factor ──────────────────────────────────────────────────────────────
 
-export type TotpSetup = { secretBase32: string; qrDataUri: string };
+export type TotpSetup = { secretBase32: string; qrDataUri: string } | { error: string };
 
 /**
- * Generate a secret and store it, but leave `totpEnabledAt` null.
+ * Begin enrolment: generate a secret and stage it as *pending*.
  *
- * Enrolment is only complete once a code round-trips. Setting the flag here
- * would lock out anyone who closed the page mid-setup.
+ * Two things this must not do, both of which it previously did. It must not
+ * touch the live secret or `totpEnabledAt` — a server action is reachable as a
+ * direct POST regardless of what the UI renders, so an attacker holding a
+ * session could call this to silently strip an existing second factor, then
+ * enrol their own device. And it must not proceed at all on an account that
+ * already has 2FA on without a current code, for the same reason `disableTotp`
+ * demands one.
  */
-export async function beginTotpSetup(): Promise<TotpSetup> {
+export async function beginTotpSetup(formData?: FormData): Promise<TotpSetup> {
   const user = await requireUser();
+
+  const stored = await db.query.users.findFirst({ where: eq(users.id, user.id) });
+
+  if (stored?.totpEnabledAt && stored.totpSecretEncrypted) {
+    const code = String(formData?.get("code") ?? "");
+    const check = verifyCodeWithCounter(
+      decryptSecret(stored.totpSecretEncrypted),
+      code,
+      stored.totpLastUsedCounter,
+    );
+    if (!check.ok) {
+      return { error: "Enter a current code from your authenticator to re-enrol." };
+    }
+  }
 
   const secret = generateSecret();
 
+  // Staged separately; the live secret stays untouched until a code confirms
+  // the new one, so an abandoned setup cannot lock anyone out.
   await db
     .update(users)
-    .set({ totpSecretEncrypted: encryptSecret(secret), totpEnabledAt: null })
+    .set({ totpSecretPendingEncrypted: encryptSecret(secret) })
     .where(eq(users.id, user.id));
 
   const uri = keyUri(secret, user.email);
@@ -84,14 +99,31 @@ export async function confirmTotpSetup(
   const user = await requireUser();
 
   const stored = await db.query.users.findFirst({ where: eq(users.id, user.id) });
-  if (!stored?.totpSecretEncrypted) return { error: "Start the setup again" };
+  if (!stored?.totpSecretPendingEncrypted) return { error: "Start the setup again" };
 
   const code = String(formData.get("code") ?? "");
-  if (!verifyCode(decryptSecret(stored.totpSecretEncrypted), code)) {
+  const result = verifyCodeWithCounter(
+    decryptSecret(stored.totpSecretPendingEncrypted),
+    code,
+    null, // a freshly generated secret has no spent counters
+  );
+
+  if (!result.ok) {
     return { error: "That code is not valid. Check your authenticator app." };
   }
 
-  await db.update(users).set({ totpEnabledAt: new Date() }).where(eq(users.id, user.id));
+  // Promote pending → live only now that a code has round-tripped.
+  await db
+    .update(users)
+    .set({
+      totpSecretEncrypted: stored.totpSecretPendingEncrypted,
+      totpSecretPendingEncrypted: null,
+      totpEnabledAt: new Date(),
+      totpLastUsedCounter: result.counter,
+      totpFailedAttempts: 0,
+      totpLockedUntil: null,
+    })
+    .where(eq(users.id, user.id));
 
   revalidatePath("/settings");
   return { success: "Two-factor authentication is on" };
@@ -111,13 +143,24 @@ export async function disableTotp(
   // Require a current code to turn it off, so someone who walks up to an
   // unlocked laptop cannot quietly remove the second factor.
   const code = String(formData.get("code") ?? "");
-  if (!verifyCode(decryptSecret(stored.totpSecretEncrypted), code)) {
-    return { error: "That code is not valid" };
-  }
+  const result = verifyCodeWithCounter(
+    decryptSecret(stored.totpSecretEncrypted),
+    code,
+    stored.totpLastUsedCounter,
+  );
+
+  if (!result.ok) return { error: "That code is not valid" };
 
   await db
     .update(users)
-    .set({ totpSecretEncrypted: null, totpEnabledAt: null })
+    .set({
+      totpSecretEncrypted: null,
+      totpSecretPendingEncrypted: null,
+      totpEnabledAt: null,
+      totpLastUsedCounter: null,
+      totpFailedAttempts: 0,
+      totpLockedUntil: null,
+    })
     .where(eq(users.id, user.id));
 
   revalidatePath("/settings");

@@ -6,6 +6,7 @@ import { users } from "@/db/schema";
 import { googleClient, parseIdToken } from "@/lib/auth/google";
 import { canRegister, consumeInvite } from "@/lib/auth/invites";
 import { createSession } from "@/lib/auth/session";
+import { setPendingCookie } from "@/lib/auth/pending";
 import { googleEnabled, env, isEmailAllowed } from "@/lib/env";
 
 export const runtime = "nodejs";
@@ -63,12 +64,18 @@ export async function GET(request: Request) {
         .set({ lastLoginAt: new Date(), avatarUrl: profile.picture })
         .where(eq(users.id, existingByGoogleId.id));
 
+      // Google satisfies the first factor only. Skipping this made the settings
+      // page's promise — "you will be asked for a code next time you sign in" —
+      // false for anyone signing in with Google.
+      if (existingByGoogleId.totpEnabledAt) {
+        await setPendingCookie(existingByGoogleId.id);
+        return NextResponse.redirect(`${env.APP_URL}/login/verify`);
+      }
+
       await createSession(existingByGoogleId.id);
       return NextResponse.redirect(`${env.APP_URL}/dashboard`);
     }
 
-    // Same verified address as an existing password account: link the two rather
-    // than creating a duplicate. Safe because Google vouched for the address.
     const existingByEmail = await db.query.users.findFirst({
       where: eq(users.email, profile.email),
     });
@@ -77,6 +84,18 @@ export async function GET(request: Request) {
       if (!existingByEmail.isActive) {
         return NextResponse.redirect(`${env.APP_URL}/login?error=account_disabled`);
       }
+
+      /**
+       * Refuse to auto-link Google onto an account protected by a password and
+       * TOTP. Linking on a verified-email match alone would let anyone able to
+       * obtain a Google-verified token for that address — a Workspace domain
+       * admin, or whoever re-registers a lapsed domain — bypass both factors in
+       * a single request. The owner can link Google deliberately from Settings.
+       */
+      if (existingByEmail.totpEnabledAt) {
+        return NextResponse.redirect(`${env.APP_URL}/login?error=link_requires_signin`);
+      }
+
       await db
         .update(users)
         .set({
@@ -113,7 +132,12 @@ export async function GET(request: Request) {
 
     return NextResponse.redirect(`${env.APP_URL}/dashboard`);
   } catch (error) {
-    console.error("[auth] google callback failed", error);
+    // Message only. The OAuth token exchange posts GOOGLE_CLIENT_SECRET, and a
+    // thrown request/response object can carry that body into the logs.
+    console.error(
+      "[auth] google callback failed:",
+      error instanceof Error ? error.message : "unknown error",
+    );
     return NextResponse.redirect(`${env.APP_URL}/login?error=oauth_failed`);
   }
 }

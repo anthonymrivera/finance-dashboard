@@ -12,6 +12,8 @@ const ERRORS: Record<string, string> = {
   not_invited: "That email has not been invited to this dashboard.",
   account_disabled: "That account has been deactivated.",
   google_unavailable: "Google sign-in is not configured on this instance.",
+  link_requires_signin:
+    "That email already has a password account with two-factor on. Sign in with your password first, then link Google from Settings.",
 };
 
 function SubmitButton({ label }: { label: string }) {

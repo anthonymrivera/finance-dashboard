@@ -5,6 +5,7 @@ import { plaidItems } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth/session";
 import { decrypt } from "@/lib/crypto";
 import { createLinkToken, createUpdateModeLinkToken } from "@/lib/plaid/client";
+import { describePlaidError } from "@/lib/plaid/errors";
 
 export const runtime = "nodejs";
 
@@ -36,7 +37,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ linkToken: await createLinkToken(user.id) });
   } catch (error) {
-    console.error("[plaid] link token creation failed", error);
+    console.error("[plaid] link token creation failed", describePlaidError(error));
     return NextResponse.json({ error: "Could not start bank connection" }, { status: 502 });
   }
 }

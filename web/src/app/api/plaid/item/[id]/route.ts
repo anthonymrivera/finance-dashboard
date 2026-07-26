@@ -5,6 +5,7 @@ import { plaidItems } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth/session";
 import { decrypt } from "@/lib/crypto";
 import { removeItem } from "@/lib/plaid/client";
+import { describePlaidError } from "@/lib/plaid/errors";
 
 export const runtime = "nodejs";
 
@@ -32,7 +33,7 @@ export async function DELETE(_request: Request, context: { params: Promise<{ id:
   } catch (error) {
     // If Plaid already dropped the Item, local cleanup should still proceed;
     // otherwise the row is unremovable through the UI forever.
-    console.warn("[plaid] itemRemove failed, continuing with local delete", error);
+    console.warn("[plaid] itemRemove failed, continuing with local delete", describePlaidError(error));
   }
 
   await db.delete(plaidItems).where(eq(plaidItems.id, item.id));

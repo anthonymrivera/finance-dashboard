@@ -107,6 +107,8 @@ export async function removeItem(accessToken: string): Promise<void> {
 // ─── Webhook verification ────────────────────────────────────────────────────
 
 const jwksCache = new Map<string, ReturnType<typeof createLocalJWKSet>>();
+/** Key ids Plaid rejected — cached so a repeat costs no outbound call. */
+const jwksFailures = new Set<string>();
 
 /**
  * Verify that a webhook genuinely came from Plaid.
@@ -121,10 +123,31 @@ export async function verifyWebhook(body: string, verificationHeader: string): P
     const { kid } = decodeProtectedHeader(verificationHeader);
     if (!kid) return false;
 
+    /**
+     * `kid` is attacker-controlled — it is read from an unverified JWT header,
+     * necessarily so, since it selects the key used to verify it. Constraining
+     * the shape before any network call stops a flood of junk key ids from
+     * turning this public endpoint into an amplifier against Plaid's API, which
+     * would exhaust the rate limit that real syncs depend on.
+     */
+    if (!/^[a-f0-9-]{16,64}$/i.test(kid)) return false;
+
+    // Remember failures too, so a repeated bogus kid costs one call, not N.
+    if (jwksFailures.has(kid)) return false;
+
     let jwks = jwksCache.get(kid);
 
     if (!jwks) {
-      const { data } = await plaid.webhookVerificationKeyGet({ key_id: kid });
+      const { data } = await plaid
+        .webhookVerificationKeyGet({ key_id: kid })
+        .catch((error: unknown) => {
+          jwksFailures.add(kid);
+          throw error;
+        });
+
+      // A key Plaid has retired must not keep verifying signatures forever.
+      if (data.key.expired_at) return false;
+
       jwks = createLocalJWKSet({ keys: [data.key as unknown] } as JSONWebKeySet);
       jwksCache.set(kid, jwks);
     }

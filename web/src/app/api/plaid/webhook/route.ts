@@ -4,6 +4,8 @@ import { db } from "@/db";
 import { plaidItems } from "@/db/schema";
 import { verifyWebhook } from "@/lib/plaid/client";
 import { syncItem } from "@/lib/plaid/sync";
+import { describePlaidError } from "@/lib/plaid/errors";
+import { rateLimit } from "@/lib/auth/rate-limit";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -16,6 +18,25 @@ export const maxDuration = 60;
  * verified before it is allowed to touch anything.
  */
 export async function POST(request: Request) {
+  /**
+   * Throttle before doing any work. This endpoint is public and unauthenticated,
+   * and verification itself may make an outbound call to Plaid — so without a
+   * brake here, unsigned junk can be used to burn function invocations and the
+   * Plaid API quota that real syncs depend on.
+   */
+  const ip =
+    request.headers.get("x-vercel-forwarded-for") ??
+    request.headers.get("x-forwarded-for")?.split(",").pop()?.trim() ??
+    "unknown";
+
+  const limit = rateLimit(`webhook:${ip}`, 60, 60 * 1000);
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } },
+    );
+  }
+
   // The raw body is needed byte-for-byte: the signature covers a hash of it,
   // and re-serializing parsed JSON would not reproduce the same bytes.
   const rawBody = await request.text();
@@ -74,7 +95,11 @@ export async function POST(request: Request) {
   } catch (error) {
     // Returning 200 regardless: the work is retried by the next webhook or the
     // scheduled sync, and a non-2xx here triggers Plaid's own retry storm.
-    console.error("[plaid] webhook handling failed", { type, code, error });
+    console.error("[plaid] webhook handling failed", {
+      type,
+      code,
+      error: describePlaidError(error),
+    });
   }
 
   return NextResponse.json({ received: true });

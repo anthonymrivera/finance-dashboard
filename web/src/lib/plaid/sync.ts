@@ -11,6 +11,7 @@ import {
 } from "@/db/schema";
 import { decrypt } from "@/lib/crypto";
 import { plaid } from "./client";
+import { plaidErrorCode } from "./errors";
 
 /**
  * Plaid reports `amount` as positive when money leaves the account and negative
@@ -71,9 +72,12 @@ export async function syncItem(itemId: string): Promise<SyncResult> {
   const item = await db.query.plaidItems.findFirst({ where: eq(plaidItems.id, itemId) });
   if (!item) throw new Error(`Plaid item not found: ${itemId}`);
 
-  const accessToken = decrypt(item.accessTokenEncrypted);
-
   try {
+    // Inside the try: a token that fails to decrypt (rotated ENCRYPTION_KEY,
+    // corrupted row) must degrade to one broken Item, not throw out of syncItem
+    // and take down every other institution's sync with it.
+    const accessToken = decrypt(item.accessTokenEncrypted);
+
     const accountsUpdated = await syncAccounts(item.id, item.userId, accessToken);
     const txResult = await syncTransactions(item.id, item.userId, accessToken, item.transactionCursor);
 
@@ -114,18 +118,19 @@ export async function syncItem(itemId: string): Promise<SyncResult> {
   }
 }
 
-/** Swallow "this Item has no such product"; re-throw anything genuinely wrong. */
+/**
+ * Swallow "this Item has no such product"; re-throw anything genuinely wrong.
+ *
+ * Returning 0 for every error would mark the Item as freshly synced with
+ * errorCode cleared, so a real outage on the holdings endpoint would read as
+ * "Synced just now" over stale positions.
+ */
 function absentProduct(error: unknown): number {
   const code = plaidErrorCode(error);
   if (ABSENT_PRODUCT_CODES.has(code)) return 0;
-  console.warn("[plaid] optional product sync failed", code);
-  return 0;
+  throw error;
 }
 
-function plaidErrorCode(error: unknown): string {
-  const maybe = error as { response?: { data?: { error_code?: string } }; message?: string };
-  return maybe?.response?.data?.error_code ?? maybe?.message ?? "UNKNOWN_ERROR";
-}
 
 async function syncAccounts(itemId: string, userId: string, accessToken: string): Promise<number> {
   const { data } = await plaid.accountsGet({ access_token: accessToken });
@@ -299,7 +304,13 @@ async function syncHoldings(itemId: string, userId: string, accessToken: string)
   const accountIdByPlaidId = await mapAccountIds(itemId);
   const securities = new Map(data.securities.map((s) => [s.security_id, s]));
 
-  const seenByAccount = new Map<string, string[]>();
+  // Seed every account on this Item with an empty list. Populating only from the
+  // response would mean an account that has been fully liquidated — and so
+  // reports no holdings at all — never appears in the delete pass, leaving its
+  // sold positions on screen forever.
+  const seenByAccount = new Map<string, string[]>(
+    [...accountIdByPlaidId.values()].map((id) => [id, []]),
+  );
   let written = 0;
 
   for (const holding of data.holdings) {
@@ -342,6 +353,14 @@ async function syncHoldings(itemId: string, userId: string, accessToken: string)
   }
 
   for (const [accountId, securityIds] of seenByAccount) {
+    // An account that reported nothing has been fully liquidated: drop all of
+    // its holdings. Handled explicitly rather than relying on how an empty array
+    // binds into `<> ALL(...)`.
+    if (securityIds.length === 0) {
+      await db.delete(holdings).where(eq(holdings.accountId, accountId));
+      continue;
+    }
+
     await db
       .delete(holdings)
       .where(
@@ -482,8 +501,32 @@ async function mapAccountIds(itemId: string): Promise<Map<string, string>> {
   return new Map(linked.filter((a) => a.plaidAccountId).map((a) => [a.plaidAccountId!, a.id]));
 }
 
-/** Sync every Item belonging to a user, in parallel. */
+/**
+ * Sync every Item belonging to a user, in parallel.
+ *
+ * allSettled, not all: one institution failing outright must not abort the
+ * others, or a single broken connection would block the whole refresh and the
+ * daily net-worth snapshot along with it.
+ */
 export async function syncAllForUser(userId: string): Promise<SyncResult[]> {
-  const items = await db.select({ id: plaidItems.id }).from(plaidItems).where(eq(plaidItems.userId, userId));
-  return Promise.all(items.map((item) => syncItem(item.id)));
+  const items = await db
+    .select({ id: plaidItems.id })
+    .from(plaidItems)
+    .where(eq(plaidItems.userId, userId));
+
+  const settled = await Promise.allSettled(items.map((item) => syncItem(item.id)));
+
+  return settled.map((result) =>
+    result.status === "fulfilled"
+      ? result.value
+      : {
+          accountsUpdated: 0,
+          added: 0,
+          modified: 0,
+          removed: 0,
+          holdings: 0,
+          liabilities: 0,
+          error: plaidErrorCode(result.reason),
+        },
+  );
 }

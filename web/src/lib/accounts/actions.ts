@@ -138,9 +138,14 @@ export async function setTransactionCategory(
 ): Promise<ActionState> {
   const user = await requireUser();
 
+  // Server actions are reachable as direct POSTs whatever the UI offers, so the
+  // value is bounded here rather than trusted from the dropdown.
+  const parsed = z.string().trim().min(1).max(64).nullable().safeParse(category);
+  if (!parsed.success) return { error: "Invalid category" };
+
   const updated = await db
     .update(transactions)
-    .set({ userCategory: category, updatedAt: new Date() })
+    .set({ userCategory: parsed.data, updatedAt: new Date() })
     .where(and(eq(transactions.id, transactionId), eq(transactions.userId, user.id)))
     .returning({ id: transactions.id });
 
