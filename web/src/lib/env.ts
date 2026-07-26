@@ -53,8 +53,20 @@ const schema = z.object({
    */
   DEMO_EMAILS: emptyToUndefined(z.string().min(1)),
 
-  /** Public origin, e.g. https://finance.example.com. Used for Plaid redirect + webhook URIs. */
-  APP_URL: z.string().url().default("http://localhost:3000"),
+  /**
+   * Public origin, e.g. https://finance.example.com. Used for Plaid redirect and
+   * webhook URIs.
+   *
+   * Trailing slashes are stripped. Everything downstream builds paths as
+   * `${APP_URL}/api/...`, so a value pasted with the slash a browser address bar
+   * shows produces `//api/...` — which Google rejects as redirect_uri_mismatch,
+   * an error that says nothing about the actual cause.
+   */
+  APP_URL: z
+    .string()
+    .url()
+    .default("http://localhost:3000")
+    .transform((v) => v.replace(/\/+$/, "")),
 
   /**
    * Optional: Google sign-in is disabled unless both are present, so the app
