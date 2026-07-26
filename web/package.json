@@ -9,6 +9,7 @@
     "lint": "eslint",
     "setup": "node scripts/setup.mjs",
     "setup:google": "node scripts/setup-google.mjs",
+    "setup:demo": "node scripts/setup-demo.mjs",
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
