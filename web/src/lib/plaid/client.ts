@@ -81,12 +81,21 @@ export async function createLinkToken(
     products: PRODUCTS,
     country_codes: COUNTRY_CODES,
     language: "en",
+    // Two years of history on first sync instead of the default 90 days — same
+    // per-account price, and the flow/spending charts start life with depth.
+    // The initial sync takes somewhat longer; the sync cursor absorbs that.
+    transactions: { days_requested: 730 },
   };
 
   // Plaid rejects localhost webhook URLs, so only register one when the app is
   // deployed somewhere publicly reachable.
   if (env.APP_URL.startsWith("https://")) {
     request.webhook = `${env.APP_URL}/api/plaid/webhook`;
+    // OAuth institutions (Chase, BofA, most majors) bounce through the bank's
+    // own consent page and return here to resume Link. The value must be
+    // byte-identical to an Allowed Redirect URI in the Plaid dashboard, or
+    // token creation is rejected.
+    request.redirect_uri = `${env.APP_URL}/plaid-oauth`;
   }
 
   const { data } = await plaidFor(environment).linkTokenCreate(request);
@@ -103,13 +112,21 @@ export async function createUpdateModeLinkToken(
   accessToken: string,
   environment: PlaidEnv,
 ): Promise<string> {
-  const { data } = await plaidFor(environment).linkTokenCreate({
+  const request: LinkTokenCreateRequest = {
     user: { client_user_id: userId },
     client_name: "Finance Dashboard",
     country_codes: COUNTRY_CODES,
     language: "en",
     access_token: accessToken,
-  });
+  };
+
+  // Repairing an OAuth item re-runs the bank's consent flow, so update mode
+  // needs the same return address as a fresh link.
+  if (env.APP_URL.startsWith("https://")) {
+    request.redirect_uri = `${env.APP_URL}/plaid-oauth`;
+  }
+
+  const { data } = await plaidFor(environment).linkTokenCreate(request);
   return data.link_token;
 }
 

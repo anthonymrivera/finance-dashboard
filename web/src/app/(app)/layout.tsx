@@ -1,89 +1,79 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
 import { isDemoEmail } from "@/lib/env";
-import { logout } from "@/lib/auth/actions";
-import { Nav } from "@/components/nav";
-import { SyncButton } from "@/components/sync-button";
+import { getNetWorth } from "@/lib/queries";
+import * as money from "@/lib/money";
+import { Grain } from "@/components/ledger";
+import { StandingFigure } from "@/components/standing-figure";
+import { LedgerNav } from "@/components/nav";
 
 /**
- * Marks a demo session so nobody — including you, mid-demo — mistakes generated
- * sandbox figures for real ones.
+ * The page.
+ *
+ * One measured column, set like a broadsheet: a masthead rule across the top,
+ * the standing figure as the lede, then the movements. Section labels sit out in
+ * the left margin as marginal notes rather than as headings in the text block —
+ * that margin is what gives the page its asymmetry, without splitting the screen
+ * into two competing halves.
+ *
+ * The figure scrolls away with everything else. Pinning it cost a third of the
+ * viewport and made the page feel like a frame around a scroller.
  */
-function DemoBadge() {
-  return (
-    <span
-      title="Sandbox data — not real accounts"
-      className="rounded-full bg-[var(--color-series-3)]/15 px-2 py-0.5 text-[0.625rem] font-semibold tracking-wide text-[var(--ink-secondary)] uppercase"
-    >
-      Demo
-    </span>
-  );
-}
-
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  // Every page in this group is behind the same check, enforced once here
-  // rather than repeated (and eventually forgotten) in each page.
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
   const isDemo = isDemoEmail(user.email);
+  const net = await getNetWorth(user.id);
 
   return (
-    <div className="flex min-h-dvh">
-      {/* Desktop sidebar */}
-      <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r px-3 py-5 md:flex">
-        <div className="mb-7 flex items-center gap-2.5 px-3">
+    <>
+      <Grain />
+
+      <div className="mx-auto min-h-dvh w-full max-w-[1680px] px-[clamp(20px,4vw,72px)] pb-[clamp(80px,14vh,160px)]">
+        <header className="pt-[clamp(24px,4vh,44px)]">
           <div
-            aria-hidden="true"
-            className="flex size-8 items-center justify-center rounded-lg bg-[var(--accent)] text-sm font-semibold text-white"
+            className="flex flex-wrap items-baseline justify-between gap-x-8 gap-y-4 border-b pb-4"
+            style={{ borderColor: "var(--rule)" }}
           >
-            $
-          </div>
-          <span className="text-[0.9375rem] font-semibold tracking-tight">Finance</span>
-          {isDemo ? <DemoBadge /> : null}
-        </div>
-
-        <Nav />
-
-        <div className="mt-auto border-t pt-4">
-          <p className="truncate px-3 text-[0.75rem] text-[var(--ink-secondary)]" title={user.email}>
-            {user.email}
-          </p>
-          <form action={logout}>
-            <button
-              type="submit"
-              className="mt-1.5 w-full rounded-lg px-3 py-1.5 text-left text-[0.8125rem] text-[var(--ink-secondary)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--ink-primary)]"
-            >
-              Sign out
-            </button>
-          </form>
-        </div>
-      </aside>
-
-      <div className="flex min-w-0 flex-1 flex-col">
-        {/* Mobile header */}
-        <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b bg-[var(--page)]/85 px-4 py-3 backdrop-blur md:hidden">
-          <div className="flex items-center gap-2">
-            <div
-              aria-hidden="true"
-              className="flex size-7 items-center justify-center rounded-lg bg-[var(--accent)] text-[0.8125rem] font-semibold text-white"
-            >
-              $
+            <div className="flex items-baseline gap-3">
+              <Link href="/dashboard" className="text-[19px] tracking-[0.01em]">
+                AMR Finance
+              </Link>
+              {isDemo ? (
+                <span
+                  title="Sandbox data — not real accounts"
+                  className="font-[family-name:var(--font-sans)] text-[9px] font-semibold tracking-[0.18em] uppercase"
+                  style={{ color: "var(--muted)" }}
+                >
+                  Demo
+                </span>
+              ) : null}
             </div>
-            <span className="text-sm font-semibold">Finance</span>
-            {isDemo ? <DemoBadge /> : null}
+
+            <LedgerNav email={user.email} />
           </div>
-          <SyncButton compact />
+
+          {/* The lede. */}
+          <div
+            className="grid gap-x-[clamp(24px,3vw,56px)] gap-y-3 border-b py-[clamp(28px,5vh,52px)] md:grid-cols-[minmax(120px,15%)_1fr]"
+            style={{ borderColor: "var(--heavy)" }}
+          >
+            <div className="label md:pt-[0.7em] md:text-right">Net position</div>
+            <div className="flex flex-wrap items-baseline justify-between gap-x-12 gap-y-3">
+              <StandingFigure value={net.netWorth} />
+              <p className="meta tabular">
+                {money.display(net.assets)} held · {money.display(net.liabilities)} owed
+              </p>
+            </div>
+          </div>
         </header>
 
-        {/* pb-24 clears the fixed mobile nav bar below. */}
-        <main className="min-w-0 flex-1 px-4 py-6 pb-24 md:px-8 md:py-8 md:pb-8">{children}</main>
-
-        {/* Mobile bottom nav */}
-        <div className="fixed inset-x-0 bottom-0 z-10 border-t bg-[var(--page)]/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
-          <Nav orientation="horizontal" />
-        </div>
+        <main>{children}</main>
       </div>
-    </div>
+    </>
   );
 }
+
+export const dynamic = "force-dynamic";

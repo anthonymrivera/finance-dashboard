@@ -46,15 +46,15 @@ export function AuthForm({
     <div className="w-full max-w-sm">
       <div className="mb-8">
         <div
-          aria-hidden="true"
-          className="mb-5 flex size-11 items-center justify-center rounded-xl bg-[var(--accent)] text-lg font-semibold text-white"
+          className="mb-7 border-b-[1.5px] pb-3 text-[19px] tracking-[0.01em]"
+          style={{ borderColor: "var(--heavy)" }}
         >
-          $
+          AMR Finance
         </div>
-        <h1 className="text-2xl font-semibold tracking-tight">
+        <h1 className="text-[26px] tracking-tight">
           {firstRun ? "Create your account" : isRegister ? "Create an account" : "Welcome back"}
         </h1>
-        <p className="mt-2 text-sm text-[var(--ink-secondary)]">
+        <p className="mt-2 text-[15px] text-[var(--muted)]">
           {firstRun
             ? "This is the first account on this instance — it will be yours."
             : isRegister
@@ -69,7 +69,7 @@ export function AuthForm({
               inside the form below would submit the credentials form instead. */}
           <a
             href="/api/auth/google"
-            className="flex h-10 w-full items-center justify-center gap-2.5 rounded-lg border bg-[var(--surface-raised)] text-sm font-medium transition-colors hover:bg-[var(--page)]"
+            className="flex h-10 w-full items-center justify-center gap-2.5 border border-[var(--heavy)] font-[family-name:var(--font-sans)] text-[11px] font-semibold tracking-[0.14em] uppercase transition-colors hover:bg-[color-mix(in_oklab,var(--wash)_60%,transparent)]"
           >
             <GoogleMark />
             Continue with Google
@@ -77,7 +77,7 @@ export function AuthForm({
 
           <div className="my-5 flex items-center gap-3">
             <span className="h-px flex-1 bg-[var(--hairline)]" />
-            <span className="text-[0.75rem] text-[var(--ink-muted)]">or</span>
+            <span className="label">or</span>
             <span className="h-px flex-1 bg-[var(--hairline)]" />
           </div>
         </>
@@ -85,7 +85,7 @@ export function AuthForm({
 
       <form action={formAction} className="space-y-4">
         <div>
-          <label htmlFor="email" className="mb-1.5 block text-[0.8125rem] font-medium">
+          <label htmlFor="email" className="label mb-2 block">
             Email
           </label>
           <input
@@ -94,13 +94,13 @@ export function AuthForm({
             type="email"
             autoComplete="email"
             required
-            className="h-10 w-full rounded-lg border bg-[var(--surface)] px-3 text-sm outline-none placeholder:text-[var(--ink-muted)] focus-visible:border-[var(--accent)]"
+            className="h-10 w-full border-0 border-b border-[var(--faint)] bg-transparent px-0 text-[16px] outline-none placeholder:text-[var(--faint)] focus-visible:border-[var(--olive)]"
             placeholder="you@example.com"
           />
         </div>
 
         <div>
-          <label htmlFor="password" className="mb-1.5 block text-[0.8125rem] font-medium">
+          <label htmlFor="password" className="label mb-2 block">
             Password
           </label>
           <input
@@ -110,11 +110,11 @@ export function AuthForm({
             autoComplete={isRegister ? "new-password" : "current-password"}
             required
             minLength={isRegister ? 12 : undefined}
-            className="h-10 w-full rounded-lg border bg-[var(--surface)] px-3 text-sm outline-none placeholder:text-[var(--ink-muted)] focus-visible:border-[var(--accent)]"
+            className="h-10 w-full border-0 border-b border-[var(--faint)] bg-transparent px-0 text-[16px] outline-none placeholder:text-[var(--faint)] focus-visible:border-[var(--olive)]"
             placeholder={isRegister ? "At least 12 characters" : "••••••••••••"}
           />
           {isRegister ? (
-            <p className="mt-1.5 text-[0.75rem] text-[var(--ink-secondary)]">
+            <p className="meta mt-2">
               12 characters minimum. Length matters more than symbols — a passphrase works well.
             </p>
           ) : null}
@@ -123,7 +123,7 @@ export function AuthForm({
         {message ? (
           <p
             role="alert"
-            className="rounded-lg border border-[var(--negative)]/30 bg-[var(--negative)]/10 px-3 py-2.5 text-[0.8125rem] text-[var(--negative)]"
+            className="border-l-2 py-1.5 pl-3 text-[14px]" style={{ borderColor: "var(--loss)", color: "var(--loss)" }}
           >
             {message}
           </p>
@@ -133,12 +133,12 @@ export function AuthForm({
       </form>
 
       {!firstRun ? (
-        <p className="mt-6 text-center text-[0.8125rem] text-[var(--ink-secondary)]">
+        <p className="mt-7 text-center text-[14px] text-[var(--muted)]">
           {isRegister ? "Already have an account?" : "Have an invite?"}{" "}
           <button
             type="button"
             onClick={() => setMode(isRegister ? "login" : "register")}
-            className="font-medium text-[var(--accent)] hover:underline"
+            className="wipe text-[var(--ink)]"
           >
             {isRegister ? "Sign in" : "Create an account"}
           </button>

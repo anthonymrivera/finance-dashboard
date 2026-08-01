@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Landmark, TrendingUp } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import {
   getAccounts,
@@ -10,25 +9,22 @@ import {
   getTransactions,
 } from "@/lib/queries";
 import * as money from "@/lib/money";
-import { Card, CardBody, CardHeader, EmptyState } from "@/components/ui/card";
-import { StatTile } from "@/components/ui/stat-tile";
-import { PageHeader } from "@/components/page-header";
+import { Movement, Line, Empty } from "@/components/ledger";
+import { FlowChart } from "@/components/charts/flow-chart";
+import { TrendLine } from "@/components/charts/trend-line";
+import { SpendRanking } from "@/components/charts/spend-ranking";
+import { Entries } from "@/components/entries";
 import { SyncButton } from "@/components/sync-button";
 import { PlaidLinkButton } from "@/components/plaid-link-button";
-import { TransactionList } from "@/components/transaction-list";
-import { CashFlowChart } from "@/components/charts/cash-flow-chart";
-import { CategoryBreakdown } from "@/components/charts/category-breakdown";
-import { NetWorthTrend } from "@/components/charts/net-worth-trend";
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage() {
+export default async function PositionPage() {
   const user = await requireUser();
 
   const monthStart = startOfMonth();
   const today = isoDate(new Date());
 
-  // Independent queries, so fire them together rather than awaiting in sequence.
   const [netWorth, accounts, cashFlow, spending, recent, history] = await Promise.all([
     getNetWorth(user.id),
     getAccounts(user.id),
@@ -40,169 +36,109 @@ export default async function DashboardPage() {
 
   if (accounts.length === 0) {
     return (
-      <>
-        <PageHeader title="Overview" />
-        <Card>
-          <EmptyState
-            icon={<Landmark className="size-8" />}
-            title="No accounts yet"
-            description="Link a bank to pull in balances and transactions automatically. Everything you connect shows up here in one view."
-            action={<PlaidLinkButton label="Link your first account" />}
-          />
-        </Card>
-      </>
+      <Movement label="Nothing linked yet" first>
+        <Empty
+          title="No accounts yet"
+          hint="Link a bank to pull in balances and transactions automatically. Everything you connect appears here."
+          action={<PlaidLinkButton label="Link your first account" />}
+        />
+      </Movement>
     );
   }
 
-  const monthSpend = spending.reduce((sum, s) => money.add(sum, s.total), "0");
-
-  // Looked up by month key rather than by position. getCashFlow zero-fills, so
-  // the last two entries *are* this month and last — but that is an invariant of
-  // another module, and comparing the wrong two months would be invisible.
-  const byMonth = new Map(cashFlow.map((m) => [m.month, m]));
-  const now = new Date();
-  const monthKey = (offset: number) => {
-    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - offset, 1));
-    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
-  };
-  const thisMonth = byMonth.get(monthKey(0));
-  const lastMonth = byMonth.get(monthKey(1));
-
-  const spendDelta =
-    thisMonth && lastMonth && money.toNumber(lastMonth.expenses) > 0
-      ? Math.round(
-          ((money.toNumber(thisMonth.expenses) - money.toNumber(lastMonth.expenses)) /
-            money.toNumber(lastMonth.expenses)) *
-            100,
-        )
-      : null;
+  const visible = accounts.filter((a) => !a.isHidden);
+  const assetAccounts = visible.filter((a) => !a.isLiability);
+  const liabilityAccounts = visible.filter((a) => a.isLiability);
 
   return (
     <>
-      <PageHeader
-        title="Overview"
-        description={`${accounts.length} account${accounts.length === 1 ? "" : "s"} connected`}
+      <Movement
+        label="What you hold"
+        first
         action={
-          <>
+          <div className="flex items-center gap-4">
             <SyncButton />
-            <PlaidLinkButton label="Add" size="sm" />
-          </>
+            <PlaidLinkButton label="Link" size="sm" variant="secondary" />
+          </div>
         }
-      />
+      >
+        <Line
+          first
+          name="Cash, deposits and investments"
+          meta={institutions(assetAccounts)}
+          amount={money.display(netWorth.assets)}
+          under={`${assetAccounts.length} account${assetAccounts.length === 1 ? "" : "s"}`}
+        />
+        <Line
+          name="Cards, loans and mortgage"
+          meta={institutions(liabilityAccounts)}
+          amount={money.display(netWorth.liabilities)}
+          under={`${liabilityAccounts.length} account${liabilityAccounts.length === 1 ? "" : "s"}`}
+        />
+      </Movement>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatTile
-          label="Net worth"
-          value={money.display(netWorth.netWorth)}
-          accent="var(--color-series-1)"
-          className="animate-in"
-        />
-        <StatTile
-          label="Assets"
-          value={money.display(netWorth.assets)}
-          accent="var(--color-series-2)"
-          className="animate-in [animation-delay:40ms]"
-        />
-        <StatTile
-          label="Liabilities"
-          value={money.display(netWorth.liabilities)}
-          accent="var(--color-series-6)"
-          className="animate-in [animation-delay:80ms]"
-        />
-        <StatTile
-          label="Spent this month"
-          value={money.display(monthSpend)}
-          // Arrow follows the number; color follows whether spending less is good.
-          trend={spendDelta === null ? undefined : spendDelta > 0 ? "up" : "down"}
-          sentiment={spendDelta === null ? "neutral" : spendDelta > 0 ? "bad" : "good"}
-          deltaLabel={
-            spendDelta === null ? undefined : `${Math.abs(spendDelta)}% vs last month`
-          }
-          accent="var(--color-series-3)"
-          className="animate-in [animation-delay:120ms]"
-        />
-      </div>
-
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <Card className="animate-in [animation-delay:160ms]">
-          <CardHeader
-            title="Net worth"
-            description={
-              history.length > 1
-                ? "Last 90 days"
-                : "Recorded daily — a trend appears once there is more than one day of history"
-            }
+      <Movement label="Trajectory · ninety days" offset={1}>
+        {history.length > 1 ? (
+          <TrendLine data={history} />
+        ) : (
+          <Empty
+            title="Not enough history yet"
+            hint="Your net worth is recorded once a day. The line appears after the second day."
           />
-          <CardBody>
-            {history.length > 1 ? (
-              <NetWorthTrend data={history} />
-            ) : (
-              <EmptyState
-                icon={<TrendingUp className="size-7" />}
-                title="Not enough history yet"
-                description="Net worth is snapshotted once a day. Check back tomorrow to see the first trend."
-              />
-            )}
-          </CardBody>
-        </Card>
+        )}
+      </Movement>
 
-        <Card className="animate-in [animation-delay:200ms]">
-          <CardHeader title="Cash flow" description="Income against spending, last 6 months" />
-          <CardBody>
-            {cashFlow.length > 0 ? (
-              <CashFlowChart data={cashFlow} />
-            ) : (
-              <EmptyState title="No transactions yet" description="Sync to pull in your history." />
-            )}
-          </CardBody>
-        </Card>
-      </div>
+      <Movement label="Flow · six months" offset={2}>
+        {cashFlow.length > 0 ? (
+          <FlowChart data={cashFlow} />
+        ) : (
+          <Empty title="No transactions yet" hint="Refresh to pull in your history." />
+        )}
+      </Movement>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-5">
-        <Card className="animate-in lg:col-span-2 [animation-delay:240ms]">
-          <CardHeader title="Where it went" description="This month, by category" />
-          <CardBody>
-            {spending.length > 0 ? (
-              <CategoryBreakdown data={spending} />
-            ) : (
-              <EmptyState title="Nothing spent yet this month" />
-            )}
-          </CardBody>
-        </Card>
+      <Movement label="Where it went · this month">
+        {spending.length > 0 ? (
+          <SpendRanking data={spending} />
+        ) : (
+          <Empty title="Nothing spent yet this month" />
+        )}
+      </Movement>
 
-        <Card className="animate-in lg:col-span-3 [animation-delay:280ms]">
-          <CardHeader
-            title="Recent activity"
-            action={
-              <Link
-                href="/transactions"
-                className="text-[0.8125rem] font-medium text-[var(--accent)] hover:underline"
-              >
-                View all
-              </Link>
-            }
-          />
-          {recent.rows.length > 0 ? (
-            <div className="border-t">
-              <TransactionList transactions={recent.rows} />
-            </div>
-          ) : (
-            <EmptyState title="No transactions yet" />
-          )}
-        </Card>
-      </div>
+      <Movement
+        label="Recent entries"
+        action={
+          <Link
+            href="/transactions"
+            className="wipe font-[family-name:var(--font-sans)] text-[11.5px] tracking-[0.05em]"
+            style={{ color: "var(--muted)" }}
+          >
+            All entries
+          </Link>
+        }
+      >
+        {recent.rows.length > 0 ? (
+          <Entries rows={recent.rows} />
+        ) : (
+          <Empty title="No entries yet" />
+        )}
+      </Movement>
     </>
   );
 }
 
+/** Up to three institution names, so the line reads rather than lists. */
+function institutions(accounts: { institutionName: string | null; isManual: boolean }[]): string {
+  const names = [
+    ...new Set(accounts.map((a) => (a.isManual ? "Manual" : (a.institutionName ?? "Linked")))),
+  ];
+  if (names.length === 0) return "None";
+  return names.length <= 3 ? names.join(" · ") : `${names.slice(0, 3).join(" · ")} +${names.length - 3}`;
+}
+
 /**
- * First day of the current month, in UTC.
- *
- * Built with Date.UTC rather than the local-time constructor: the result is
- * serialized with toISOString(), which converts to UTC, so a local-time
- * construction west of Greenwich resolves to the last day of the *previous*
- * month. Correct today only because Vercel runs UTC — this makes it correct
- * anywhere.
+ * First of the month in UTC. Built with Date.UTC because the result is
+ * serialized with toISOString(); a local-time construction west of Greenwich
+ * resolves to the previous month.
  */
 function startOfMonth(): string {
   const now = new Date();

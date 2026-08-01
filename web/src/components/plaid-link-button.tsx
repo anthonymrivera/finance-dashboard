@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { usePlaidLink, type PlaidLinkOnSuccessMetadata } from "react-plaid-link";
+import { clearLinkToken, saveLinkToken } from "@/lib/plaid/link-storage";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -46,6 +47,9 @@ export function PlaidLinkButton({
         setError(data.error ?? "Could not start");
         return;
       }
+      // Parked for the OAuth round-trip: banks like Chase leave this page for
+      // their own consent screen, and /plaid-oauth resumes with this token.
+      saveLinkToken(data.linkToken);
       setLinkToken(data.linkToken);
     } catch {
       setError("Could not reach the server");
@@ -78,6 +82,7 @@ export function PlaidLinkButton({
       } finally {
         setLoading(false);
         setLinkToken(null);
+        clearLinkToken();
       }
     },
     [router, onLinked],
@@ -86,7 +91,10 @@ export function PlaidLinkButton({
   const { open, ready } = usePlaidLink({
     token: linkToken,
     onSuccess,
-    onExit: () => setLinkToken(null),
+    onExit: () => {
+      setLinkToken(null);
+      clearLinkToken();
+    },
   });
 
   // Link tokens are minted on demand, so opening waits for the token to arrive

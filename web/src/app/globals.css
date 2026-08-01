@@ -1,168 +1,302 @@
 @import "tailwindcss";
 
 /**
- * Design tokens.
+ * The Ledger.
  *
- * Colors come from a validated data-visualization palette: the eight categorical
- * slots are colorblind-safe in a fixed order (worst adjacent CVD ΔE 24.2 in light,
- * 10.3 in dark), and the surfaces below are the ones that validation ran against.
- * Changing a surface invalidates the contrast results, so treat these as a set.
+ * An accounting book rather than a dashboard: warm paper, ink, hairline rules,
+ * and no cards. Serif carries anything you read; sans is reserved for
+ * machine-voice — labels, categories, codes — which is most of why the two
+ * registers feel deliberate rather than decorative.
+ *
+ * Chart colour is a single-hue olive ramp, not a categorical palette. The
+ * spending breakdown is ranked by magnitude, so it is sequential data; an
+ * eight-hue categorical set was both wrong for the encoding and failed
+ * validation outright (muted earthy tones read as grey and adjacent pairs were
+ * indistinguishable). Both ramps below are validated: monotone lightness,
+ * >=0.06 step gaps, single hue, and a light end that clears its own surface.
  */
 
 @theme {
+  --font-serif: var(--font-serif-vf), "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
   --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", monospace;
-
-  /* Categorical series — fixed order, never cycled */
-  --color-series-1: #2a78d6;
-  --color-series-2: #1baf7a;
-  --color-series-3: #eda100;
-  --color-series-4: #008300;
-  --color-series-5: #4a3aa7;
-  --color-series-6: #e34948;
-  --color-series-7: #e87ba4;
-  --color-series-8: #eb6834;
-
-  /* Status — reserved, never reused as a series color */
-  --color-good: #0ca30c;
-  --color-warning: #fab219;
-  --color-serious: #ec835a;
-  --color-critical: #d03b3b;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
 }
 
 :root {
   color-scheme: light;
 
-  --page: #f9f9f7;
-  --surface: #fcfcfb;
-  --surface-raised: #ffffff;
+  --paper: #f2ece0;
+  --wash: #e0d9c5;
+  --ink: #24221d;
+  --muted: #7a7464;
+  --faint: #a49c86;
 
-  --ink-primary: #0b0b0b;
-  --ink-secondary: #52514e;
-  --ink-muted: #898781;
+  --rule: #d6cdb6;
+  --heavy: #24221d;
 
-  --hairline: rgba(11, 11, 11, 0.1);
-  --gridline: #e1e0d9;
-  --baseline: #c3c2b7;
+  --olive: #5c6438;
+  --gain: #4a5a2e;
+  --loss: #9c3f22;
+  --warn: #a8762a;
 
-  --positive: #006300;
-  --negative: #d03b3b;
-
-  --accent: #2a78d6;
-  --accent-hover: #256abf;
-  --accent-ink: #ffffff;
-
-  --shadow-sm: 0 1px 2px rgba(11, 11, 11, 0.04);
-  --shadow-md: 0 2px 8px rgba(11, 11, 11, 0.06), 0 1px 2px rgba(11, 11, 11, 0.04);
-  --shadow-lg: 0 8px 32px rgba(11, 11, 11, 0.08), 0 2px 8px rgba(11, 11, 11, 0.04);
+  /* Ordinal ramp — light end clears the paper at 2.03:1 */
+  --r1: #a3ad76;
+  --r2: #8f9a5e;
+  --r3: #7b8649;
+  --r4: #677237;
+  --r5: #535e28;
+  --r6: #40491c;
+  --r7: #2f3713;
+  --r8: #20260c;
 }
 
-/* Dark values are a selected set stepped for the dark surface, not an inversion. */
+/**
+ * Dark is a selected second design — the same book by lamplight. Warm
+ * brown-black, never neutral grey, with its own ramp stepped for this surface.
+ */
 @media (prefers-color-scheme: dark) {
   :root:where(:not([data-theme="light"])) {
     color-scheme: dark;
 
-    --page: #0d0d0d;
-    --surface: #1a1a19;
-    --surface-raised: #232322;
+    --paper: #14120d;
+    --wash: #1c1913;
+    --ink: #eee7d5;
+    --muted: #8f8874;
+    --faint: #655f4f;
 
-    --ink-primary: #ffffff;
-    --ink-secondary: #c3c2b7;
-    --ink-muted: #898781;
+    --rule: #2c281e;
+    --heavy: #544e3e;
 
-    --hairline: rgba(255, 255, 255, 0.1);
-    --gridline: #2c2c2a;
-    --baseline: #383835;
+    --olive: #9fac6b;
+    --gain: #9fac6b;
+    --loss: #d1734f;
+    --warn: #d4a24c;
 
-    --positive: #0ca30c;
-    --negative: #e66767;
-
-    --accent: #3987e5;
-    --accent-hover: #5598e7;
-
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-    --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.25);
-    --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.3);
-
-    --color-series-1: #3987e5;
-    --color-series-2: #199e70;
-    --color-series-3: #c98500;
-    --color-series-4: #008300;
-    --color-series-5: #9085e9;
-    --color-series-6: #e66767;
-    --color-series-7: #d55181;
-    --color-series-8: #d95926;
+    --r1: #e2e7c8;
+    --r2: #cbd3aa;
+    --r3: #b4bd8d;
+    --r4: #9fa972;
+    --r5: #8a955a;
+    --r6: #757f47;
+    --r7: #5f6938;
+    --r8: #4a532a;
   }
 }
 
-/* The explicit toggle must beat the OS setting in both directions. */
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --page: #0d0d0d;
-  --surface: #1a1a19;
-  --surface-raised: #232322;
+  --paper: #14120d;
+  --wash: #1c1913;
+  --ink: #eee7d5;
+  --muted: #8f8874;
+  --faint: #655f4f;
 
-  --ink-primary: #ffffff;
-  --ink-secondary: #c3c2b7;
-  --ink-muted: #898781;
+  --rule: #2c281e;
+  --heavy: #544e3e;
 
-  --hairline: rgba(255, 255, 255, 0.1);
-  --gridline: #2c2c2a;
-  --baseline: #383835;
+  --olive: #9fac6b;
+  --gain: #9fac6b;
+  --loss: #d1734f;
+  --warn: #d4a24c;
 
-  --positive: #0ca30c;
-  --negative: #e66767;
+  --r1: #e2e7c8;
+  --r2: #cbd3aa;
+  --r3: #b4bd8d;
+  --r4: #9fa972;
+  --r5: #8a955a;
+  --r6: #757f47;
+  --r7: #5f6938;
+  --r8: #4a532a;
+}
 
-  --accent: #3987e5;
-  --accent-hover: #5598e7;
+/**
+ * Emphasis ramp — the ordinal ramp addressed by *prominence* rather than by
+ * lightness.
+ *
+ * `--r1…--r8` always run light to dark, in both modes. But "most prominent"
+ * inverts with the surface: on paper the heaviest rank wants the darkest step,
+ * on a dark surface it wants the lightest. Ranked charts must therefore index by
+ * emphasis, not by lightness — using `--r8` for rank 1 unconditionally painted
+ * the largest category almost invisibly against the dark surface.
+ *
+ * `--e1` is always the most emphatic step for the current surface.
+ */
+:root {
+  --e1: var(--r8);
+  --e2: var(--r7);
+  --e3: var(--r6);
+  --e4: var(--r5);
+  --e5: var(--r4);
+  --e6: var(--r3);
+  --e7: var(--r2);
+  --e8: var(--r1);
+}
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.25);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.3);
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    --e1: var(--r1);
+    --e2: var(--r2);
+    --e3: var(--r3);
+    --e4: var(--r4);
+    --e5: var(--r5);
+    --e6: var(--r6);
+    --e7: var(--r7);
+    --e8: var(--r8);
+  }
+}
 
-  --color-series-1: #3987e5;
-  --color-series-2: #199e70;
-  --color-series-3: #c98500;
-  --color-series-4: #008300;
-  --color-series-5: #9085e9;
-  --color-series-6: #e66767;
-  --color-series-7: #d55181;
-  --color-series-8: #d95926;
+:root[data-theme="dark"] {
+  --e1: var(--r1);
+  --e2: var(--r2);
+  --e3: var(--r3);
+  --e4: var(--r4);
+  --e5: var(--r5);
+  --e6: var(--r6);
+  --e7: var(--r7);
+  --e8: var(--r8);
+}
+
+/**
+ * Migration shim.
+ *
+ * Maps the previous token names onto the Ledger palette so every screen not yet
+ * rewritten renders in the new colours instead of falling back to unset. These
+ * are debt: each one should disappear as its consumers are rewritten, and the
+ * block deleted once `grep -r -- "--ink-primary\|--surface\|--accent" src/`
+ * comes back empty.
+ */
+:root,
+:root[data-theme="dark"] {
+  --page: var(--paper);
+  --surface: var(--paper);
+  --surface-raised: var(--wash);
+  --ink-primary: var(--ink);
+  --ink-secondary: var(--muted);
+  --ink-muted: var(--faint);
+  --hairline: var(--rule);
+  --gridline: var(--rule);
+  --baseline: var(--heavy);
+  --positive: var(--gain);
+  --negative: var(--loss);
+  --warning: var(--warn);
+  --accent: var(--olive);
+  --accent-hover: var(--olive);
+  --accent-ink: var(--paper);
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+
+  --color-series-1: var(--r8);
+  --color-series-2: var(--r7);
+  --color-series-3: var(--r6);
+  --color-series-4: var(--r5);
+  --color-series-5: var(--r4);
+  --color-series-6: var(--r3);
+  --color-series-7: var(--r2);
+  --color-series-8: var(--r1);
 }
 
 body {
-  background: var(--page);
-  color: var(--ink-primary);
-  font-family: var(--font-sans);
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-serif);
+  font-size: 16px;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
+  /* No child should ever push the page sideways on a phone. */
+  overflow-x: hidden;
 }
 
-/* Money and any column that must align vertically. */
+/* Machine-voice: labels, categories, codes. Never body copy. */
+.label {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.meta {
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
 .tabular {
   font-variant-numeric: tabular-nums;
 }
 
-@keyframes fd-fade-up {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
+/**
+ * Paper grain. Explicit width/height because an SVG given only `inset: 0` sits
+ * at its 300x150 intrinsic size and shows as a hard-edged patch.
+ */
+.grain {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 40;
+  opacity: 0.24;
+  mix-blend-mode: multiply;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) .grain {
+    mix-blend-mode: overlay;
+    opacity: 0.45;
   }
 }
 
-.animate-in {
-  animation: fd-fade-up 0.35s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+:root[data-theme="dark"] .grain {
+  mix-blend-mode: overlay;
+  opacity: 0.45;
+}
+
+/* Nav underline wipes in from the left rather than fading. */
+.wipe {
+  position: relative;
+}
+.wipe::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 100%;
+  bottom: -3px;
+  height: 1px;
+  background: var(--olive);
+  transition: right 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.wipe:hover::after,
+.wipe[aria-current="page"]::after {
+  right: 0;
+}
+
+/* Movements rise as they enter. No JS; degrades to static where unsupported. */
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: view()) {
+    .movement {
+      animation: rise linear both;
+      animation-timeline: view();
+      animation-range: entry 8% cover 26%;
+    }
+    @keyframes rise {
+      from {
+        opacity: 0;
+        transform: translateY(26px);
+      }
+      to {
+        opacity: 1;
+        transform: none;
+      }
+    }
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .animate-in {
-    animation: none;
-  }
   *,
   *::before,
   *::after {
@@ -171,20 +305,11 @@ body {
   }
 }
 
-/* Visible focus for keyboard users without a permanent ring on mouse clicks. */
 :focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-  border-radius: 4px;
+  outline: 2px solid var(--olive);
+  outline-offset: 3px;
 }
 
 ::selection {
-  background: color-mix(in oklab, var(--accent) 25%, transparent);
-}
-
-/* Recharts injects its own focus outlines on every surface; suppress them and
-   rely on our own hover/tooltip layer instead. */
-.recharts-wrapper :focus,
-.recharts-surface:focus {
-  outline: none;
+  background: color-mix(in oklab, var(--olive) 26%, transparent);
 }

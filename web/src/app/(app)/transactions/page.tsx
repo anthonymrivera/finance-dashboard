@@ -1,12 +1,10 @@
 import Link from "next/link";
-import { Receipt } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { getAccounts, getTransactions, getUsedCategories } from "@/lib/queries";
 import * as money from "@/lib/money";
-import { Card, EmptyState } from "@/components/ui/card";
-import { PageHeader } from "@/components/page-header";
+import { Movement, Empty } from "@/components/ledger";
+import { Entries } from "@/components/entries";
 import { SyncButton } from "@/components/sync-button";
-import { TransactionList } from "@/components/transaction-list";
 import { TransactionFiltersBar } from "./filters";
 
 export const dynamic = "force-dynamic";
@@ -48,55 +46,52 @@ export default async function TransactionsPage({
   // usually being manipulated to find.
   const net = rows.reduce((sum, tx) => money.add(sum, tx.amount), "0");
 
+  const unfiltered = total === 0 && !search && !category;
+
   return (
     <>
-      <PageHeader
-        title="Transactions"
-        description={
-          total > 0
-            ? `${total.toLocaleString()} transaction${total === 1 ? "" : "s"} · net ${money.display(net, { signed: true })} on this page`
-            : undefined
-        }
-        action={<SyncButton />}
-      />
+      <Movement label="Entries" first action={<SyncButton />}>
+        {total > 0 ? (
+          <p className="mb-8 text-[17px]" style={{ color: "var(--muted)" }}>
+            {total.toLocaleString()} entr{total === 1 ? "y" : "ies"} · net{" "}
+            <span className="tabular" style={{ color: "var(--ink)" }}>
+              {money.display(net, { signed: true })}
+            </span>{" "}
+            on this page
+          </p>
+        ) : null}
 
-      <TransactionFiltersBar accounts={accounts} categories={categories} />
+        <TransactionFiltersBar accounts={accounts} categories={categories} />
 
-      <Card className="mt-4">
-        {rows.length > 0 ? (
-          <TransactionList transactions={rows} />
-        ) : (
-          <EmptyState
-            icon={<Receipt className="size-8" />}
-            title={total === 0 && !search && !category ? "No transactions yet" : "Nothing matches those filters"}
-            description={
-              total === 0 && !search && !category
-                ? "Link a bank account and sync to pull in your history."
-                : "Try widening the date range or clearing a filter."
-            }
-          />
-        )}
-      </Card>
+        <div className="mt-9">
+          {rows.length > 0 ? (
+            <Entries rows={rows} />
+          ) : (
+            <Empty
+              title={unfiltered ? "No entries yet" : "Nothing matches those filters"}
+              hint={
+                unfiltered
+                  ? "Link a bank account and refresh to pull in your history."
+                  : "Try widening the date range or clearing a filter."
+              }
+            />
+          )}
+        </div>
 
-      {totalPages > 1 ? (
-        <nav aria-label="Pagination" className="mt-4 flex items-center justify-between gap-3">
-          <PageLink
-            params={params}
-            page={page - 1}
-            disabled={page <= 1}
-            label="← Previous"
-          />
-          <span className="text-[0.8125rem] text-[var(--ink-secondary)]">
-            Page {page} of {totalPages}
-          </span>
-          <PageLink
-            params={params}
-            page={page + 1}
-            disabled={page >= totalPages}
-            label="Next →"
-          />
-        </nav>
-      ) : null}
+        {totalPages > 1 ? (
+          <nav
+            aria-label="Pagination"
+            className="mt-10 flex items-center justify-between gap-4 border-t pt-6"
+            style={{ borderColor: "var(--rule)" }}
+          >
+            <PageLink params={params} page={page - 1} disabled={page <= 1} label="← Previous" />
+            <span className="label">
+              Page {page} of {totalPages}
+            </span>
+            <PageLink params={params} page={page + 1} disabled={page >= totalPages} label="Next →" />
+          </nav>
+        ) : null}
+      </Movement>
     </>
   );
 }
@@ -116,7 +111,8 @@ function PageLink({
     return (
       <span
         aria-disabled="true"
-        className="rounded-lg border px-3 py-1.5 text-[0.8125rem] opacity-40"
+        className="font-[family-name:var(--font-sans)] text-[11.5px] opacity-40"
+        style={{ color: "var(--muted)" }}
       >
         {label}
       </span>
@@ -135,7 +131,8 @@ function PageLink({
   return (
     <Link
       href={`/transactions?${query.toString()}`}
-      className="rounded-lg border px-3 py-1.5 text-[0.8125rem] font-medium transition-colors hover:bg-[var(--surface)]"
+      className="wipe font-[family-name:var(--font-sans)] text-[11.5px]"
+      style={{ color: "var(--ink)" }}
     >
       {label}
     </Link>

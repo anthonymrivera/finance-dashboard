@@ -1,18 +1,15 @@
-import { AlertTriangle, Landmark } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import {
   getAccounts,
   getHoldings,
   getLiabilityDetails,
-  getNetWorth,
   type AccountWithInstitution,
 } from "@/lib/queries";
 import { HoldingsTable, LiabilityFacts } from "@/components/account-detail";
 import * as money from "@/lib/money";
 import { cn, humanizeCategory, relativeTime } from "@/lib/utils";
-import { Card, CardBody, CardHeader, EmptyState } from "@/components/ui/card";
-import { StatTile } from "@/components/ui/stat-tile";
-import { PageHeader } from "@/components/page-header";
+import { Movement, Empty } from "@/components/ledger";
 import { SyncButton } from "@/components/sync-button";
 import { PlaidLinkButton } from "@/components/plaid-link-button";
 import { AddManualAccount } from "./add-manual-account";
@@ -21,9 +18,8 @@ export const dynamic = "force-dynamic";
 
 export default async function AccountsPage() {
   const user = await requireUser();
-  const [accounts, netWorth, holdings, liabilities] = await Promise.all([
+  const [accounts, holdings, liabilities] = await Promise.all([
     getAccounts(user.id),
-    getNetWorth(user.id),
     getHoldings(user.id),
     getLiabilityDetails(user.id),
   ]);
@@ -36,135 +32,125 @@ export default async function AccountsPage() {
 
   return (
     <>
-      <PageHeader
-        title="Accounts"
-        description="Linked banks update automatically. Manual accounts are yours to maintain."
-        action={
-          <>
-            <SyncButton />
-            <PlaidLinkButton label="Link bank" size="sm" />
-          </>
-        }
-      />
-
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatTile label="Net worth" value={money.display(netWorth.netWorth)} accent="var(--color-series-1)" />
-        <StatTile label="Assets" value={money.display(netWorth.assets)} accent="var(--color-series-2)" />
-        <StatTile
-          label="Liabilities"
-          value={money.display(netWorth.liabilities)}
-          accent="var(--color-series-6)"
-        />
-      </div>
-
       {accounts.length === 0 ? (
-        <Card className="mt-4">
-          <EmptyState
-            icon={<Landmark className="size-8" />}
+        <Movement
+          label="Holdings"
+          first
+          action={
+            <div className="flex items-center gap-4">
+              <SyncButton />
+              <PlaidLinkButton label="Link bank" size="sm" variant="secondary" />
+            </div>
+          }
+        >
+          <Empty
             title="No accounts yet"
-            description="Link a bank to pull balances and transactions automatically, or add something manually for assets Plaid cannot reach."
+            hint="Link a bank to pull balances and transactions automatically, or add something manually for assets Plaid cannot reach."
             action={<PlaidLinkButton label="Link your first account" />}
           />
-        </Card>
-      ) : (
-        <div className="mt-4 space-y-4">
-          {groups.map((group) => (
-            <Card key={group.key}>
-              <CardHeader
-                title={group.name}
-                description={
-                  group.isManual
-                    ? "Tracked manually"
-                    : group.lastSyncedAt
-                      ? `Synced ${relativeTime(group.lastSyncedAt)}`
-                      : "Not synced yet"
-                }
-                action={
-                  <span className="text-[0.875rem] font-semibold tabular">
-                    {money.display(group.total)}
-                  </span>
-                }
-              />
+        </Movement>
+      ) : null}
 
-              {group.errorCode ? (
-                <div className="mx-5 mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-[var(--warning)]/40 bg-[var(--warning)]/10 px-4 py-3">
-                  {/* Icon plus text, so the warning does not rely on color alone. */}
-                  <AlertTriangle className="size-4 shrink-0 text-[var(--warning)]" aria-hidden="true" />
-                  <p className="min-w-0 flex-1 text-[0.8125rem]">
-                    This connection needs attention
-                    <span className="text-[var(--ink-secondary)]"> — {explainError(group.errorCode)}</span>
-                  </p>
-                  {group.itemId ? (
-                    <PlaidLinkButton itemId={group.itemId} label="Reconnect" variant="secondary" size="sm" />
-                  ) : null}
-                </div>
-              ) : null}
-
-              <div className="border-t">
-                <ul className="divide-y">
-                  {group.accounts.map((account) => (
-                    <li key={account.id} className={cn(account.isHidden && "opacity-55")}>
-                      <div className="flex items-center gap-4 px-5 py-3.5">
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-[0.875rem] font-medium">
-                          {account.name}
-                          {account.mask ? (
-                            <span className="ml-1.5 font-normal text-[var(--ink-muted)]">
-                              ••{account.mask}
-                            </span>
-                          ) : null}
-                        </p>
-                        <p className="mt-0.5 text-[0.75rem] text-[var(--ink-secondary)]">
-                          {humanizeCategory(account.subtype ?? account.type)}
-                          {account.isHidden ? " · Hidden from totals" : ""}
-                        </p>
-                      </div>
-
-                      <div className="shrink-0 text-right">
-                        <p className="text-[0.9375rem] font-semibold tabular">
-                          {money.display(account.currentBalance, {
-                            currency: account.isoCurrencyCode,
-                          })}
-                        </p>
-                        {account.availableBalance ? (
-                          <p className="mt-0.5 text-[0.75rem] text-[var(--ink-secondary)] tabular">
-                            {money.display(account.availableBalance, {
-                              currency: account.isoCurrencyCode,
-                            })}{" "}
-                            available
-                          </p>
-                        ) : account.creditLimit ? (
-                          <p className="mt-0.5 text-[0.75rem] text-[var(--ink-secondary)] tabular">
-                            of{" "}
-                            {money.display(account.creditLimit, {
-                              currency: account.isoCurrencyCode,
-                            })}{" "}
-                            limit
-                          </p>
-                        ) : null}
-                        </div>
-                      </div>
-
-                      <HoldingsTable holdings={holdingsByAccount.get(account.id) ?? []} />
-                      <LiabilityFacts detail={liabilityByAccount.get(account.id)} />
-                    </li>
-                  ))}
-                </ul>
+      {groups.map((group, index) => (
+        <Movement
+          key={group.key}
+          label={group.name}
+          first={index === 0}
+          action={
+            index === 0 ? (
+              <div className="flex items-center gap-4">
+                <SyncButton />
+                <PlaidLinkButton label="Link bank" size="sm" variant="secondary" />
               </div>
-            </Card>
-          ))}
-        </div>
-      )}
+            ) : undefined
+          }
+        >
+          <div className="mb-5 flex items-baseline justify-between gap-4">
+            <span className="meta">
+              {group.isManual
+                ? "Tracked manually"
+                : group.lastSyncedAt
+                  ? `Synced ${relativeTime(group.lastSyncedAt)}`
+                  : "Not synced yet"}
+            </span>
+            <span className="tabular text-[17px]">{money.display(group.total)}</span>
+          </div>
 
-      <Card className="mt-4">
-        <CardHeader
-          title="Add a manual account"
-          description="For anything Plaid cannot link — cash, a vehicle, property, a private pension."
-        />
-        <CardBody>
+          {group.errorCode ? (
+            <div
+              className="mb-6 flex flex-wrap items-center gap-3 border-l-2 py-3 pl-4"
+              style={{ borderColor: "var(--warn)" }}
+            >
+              {/* Icon plus text, so the warning does not rely on colour alone. */}
+              <AlertTriangle className="size-4 shrink-0" style={{ color: "var(--warn)" }} aria-hidden="true" />
+              <p className="min-w-0 flex-1 text-[15px]">
+                This connection needs attention
+                <span style={{ color: "var(--muted)" }}> — {explainError(group.errorCode)}</span>
+              </p>
+              {group.itemId ? (
+                <PlaidLinkButton itemId={group.itemId} label="Reconnect" variant="secondary" size="sm" />
+              ) : null}
+            </div>
+          ) : null}
+
+          <div className="border-t-[1.5px]" style={{ borderColor: "var(--heavy)" }}>
+            {group.accounts.map((account) => (
+              <div
+                key={account.id}
+                className={cn("border-b py-5", account.isHidden && "opacity-55")}
+                style={{ borderColor: "var(--rule)" }}
+              >
+                <div className="grid grid-cols-[1fr_auto] items-baseline gap-x-8">
+                  <div className="min-w-0">
+                    <div className="truncate text-[18px]">
+                      {account.name}
+                      {account.mask ? (
+                        <span style={{ color: "var(--faint)" }}> ••{account.mask}</span>
+                      ) : null}
+                    </div>
+                    <div className="meta mt-1.5">
+                      {humanizeCategory(account.subtype ?? account.type)}
+                      {account.isHidden ? " · Hidden from totals" : ""}
+                    </div>
+                  </div>
+
+                  <div className="text-right whitespace-nowrap">
+                    <div className="tabular text-[18px]">
+                      {money.display(account.currentBalance, { currency: account.isoCurrencyCode })}
+                    </div>
+                    {account.availableBalance ? (
+                      <div className="meta tabular mt-1.5">
+                        {money.display(account.availableBalance, {
+                          currency: account.isoCurrencyCode,
+                        })}{" "}
+                        available
+                      </div>
+                    ) : account.creditLimit ? (
+                      <div className="meta tabular mt-1.5">
+                        of{" "}
+                        {money.display(account.creditLimit, { currency: account.isoCurrencyCode })}{" "}
+                        limit
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+
+                <HoldingsTable holdings={holdingsByAccount.get(account.id) ?? []} />
+                <LiabilityFacts detail={liabilityByAccount.get(account.id)} />
+              </div>
+            ))}
+          </div>
+        </Movement>
+      ))}
+
+      <Movement label="Add a manual account" offset={1}>
+        <p className="mb-7 max-w-[46ch] text-[17px]" style={{ color: "var(--muted)" }}>
+          For anything Plaid cannot link — cash, a vehicle, property, a private pension.
+        </p>
+        <div className="border-t-[1.5px] pt-7" style={{ borderColor: "var(--heavy)" }}>
           <AddManualAccount />
-        </CardBody>
-      </Card>
+        </div>
+      </Movement>
     </>
   );
 }

@@ -6,19 +6,22 @@ import { cn } from "@/lib/utils";
 type Variant = "primary" | "secondary" | "ghost" | "danger";
 type Size = "sm" | "md";
 
+/**
+ * Buttons speak the ledger's machine-voice: square, uppercase sans, tracked —
+ * the register of a stamp, not a pill. Primary is solid ink on paper (inverting
+ * naturally in dark mode); secondary is an inked border; ghost is bare text.
+ */
 const VARIANTS: Record<Variant, string> = {
-  primary:
-    "bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)] shadow-[var(--shadow-sm)]",
+  primary: "bg-[var(--ink)] text-[var(--paper)] hover:opacity-85",
   secondary:
-    "border bg-[var(--surface-raised)] text-[var(--ink-primary)] hover:bg-[var(--page)]",
-  ghost: "text-[var(--ink-secondary)] hover:bg-[var(--page)] hover:text-[var(--ink-primary)]",
-  danger:
-    "border border-[var(--negative)]/30 text-[var(--negative)] hover:bg-[var(--negative)]/10",
+    "border border-[var(--heavy)] text-[var(--ink)] hover:bg-[color-mix(in_oklab,var(--wash)_60%,transparent)]",
+  ghost: "text-[var(--muted)] hover:text-[var(--ink)]",
+  danger: "border border-[var(--loss)] text-[var(--loss)] hover:bg-[var(--loss)]/10",
 };
 
 const SIZES: Record<Size, string> = {
-  sm: "h-8 px-3 text-[0.8125rem] gap-1.5",
-  md: "h-10 px-4 text-sm gap-2",
+  sm: "h-8 px-3.5 text-[10.5px] gap-1.5",
+  md: "h-10 px-5 text-[11px] gap-2",
 };
 
 export function Button({
@@ -43,8 +46,8 @@ export function Button({
       // is a purely visual signal.
       aria-busy={loading || undefined}
       className={cn(
-        "inline-flex items-center justify-center rounded-lg font-medium",
-        "transition-colors duration-150",
+        "inline-flex items-center justify-center font-[family-name:var(--font-sans)] font-semibold tracking-[0.14em] uppercase",
+        "transition-[background-color,color,opacity] duration-150",
         "disabled:cursor-not-allowed disabled:opacity-50",
         VARIANTS[variant],
         SIZES[size],
