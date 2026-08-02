@@ -2,7 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { usePlaidLink, type PlaidLinkOnSuccessMetadata } from "react-plaid-link";
+import {
+  usePlaidLink,
+  type PlaidLinkError,
+  type PlaidLinkOnExitMetadata,
+  type PlaidLinkOnSuccessMetadata,
+} from "react-plaid-link";
 import { clearLinkToken, saveLinkToken } from "@/lib/plaid/link-storage";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -91,9 +96,33 @@ export function PlaidLinkButton({
   const { open, ready } = usePlaidLink({
     token: linkToken,
     onSuccess,
-    onExit: () => {
+    onExit: (err: PlaidLinkError | null, metadata: PlaidLinkOnExitMetadata) => {
       setLinkToken(null);
       clearLinkToken();
+
+      /**
+       * Plaid states why Link closed; discarding it turns every failure into
+       * "nothing happened", which is unaidable. A user-cancelled exit carries no
+       * error and should stay silent — anything else is surfaced with the code,
+       * because that code is what makes a Plaid support request answerable.
+       */
+      if (!err) return;
+
+      const detail = [err.error_code, err.display_message ?? err.error_message]
+        .filter(Boolean)
+        .join(" — ");
+      setError(detail || "Link closed unexpectedly");
+
+      // The request id is what Plaid support asks for first.
+      console.error("Plaid Link exited", {
+        error_code: err.error_code,
+        error_type: err.error_type,
+        error_message: err.error_message,
+        request_id: metadata.request_id,
+        link_session_id: metadata.link_session_id,
+        institution: metadata.institution?.name,
+        status: metadata.status,
+      });
     },
   });
 
@@ -110,7 +139,11 @@ export function PlaidLinkButton({
         {label}
       </Button>
       {error ? (
-        <span role="alert" className="text-[0.75rem] text-[var(--negative)]">
+        <span
+          role="alert"
+          className="max-w-[42ch] text-[11.5px] leading-snug"
+          style={{ color: "var(--loss)" }}
+        >
           {error}
         </span>
       ) : null}

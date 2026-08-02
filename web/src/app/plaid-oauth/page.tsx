@@ -3,7 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { usePlaidLink, type PlaidLinkOnSuccessMetadata } from "react-plaid-link";
+import {
+  usePlaidLink,
+  type PlaidLinkError,
+  type PlaidLinkOnSuccessMetadata,
+} from "react-plaid-link";
 import { clearLinkToken, readLinkToken } from "@/lib/plaid/link-storage";
 
 /**
@@ -66,8 +70,17 @@ export default function PlaidOauthPage() {
     token,
     receivedRedirectUri: receivedRedirectUri ?? undefined,
     onSuccess,
-    onExit: () => {
+    onExit: (err: PlaidLinkError | null) => {
       clearLinkToken();
+      // A failure on the return leg is the hardest kind to debug — state it here
+      // rather than bouncing silently back to a page that looks unchanged.
+      if (err) {
+        setFailed(
+          [err.error_code, err.display_message ?? err.error_message].filter(Boolean).join(" — ") ||
+            "The connection did not complete.",
+        );
+        return;
+      }
       router.replace("/accounts");
     },
   });
