@@ -8,6 +8,7 @@ import {
   type PlaidLinkOnExitMetadata,
   type PlaidLinkOnSuccessMetadata,
 } from "react-plaid-link";
+import type { LinkKind } from "@/lib/plaid/client";
 import { clearLinkToken, saveLinkToken } from "@/lib/plaid/link-storage";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -19,16 +20,20 @@ import { Button } from "@/components/ui/button";
  * we only ever receive a short-lived public token, which the server immediately
  * trades for an access token it stores encrypted.
  *
- * Pass `itemId` to run Link in update mode and repair a broken connection.
+ * Pass `itemId` to run Link in update mode and repair a broken connection, or
+ * `kind="investments"` for a brokerage or retirement login with no bank
+ * accounts or cards in it, which a banking session would refuse to link.
  */
 export function PlaidLinkButton({
   itemId,
+  kind = "banking",
   label = "Link an account",
   variant = "primary",
   size = "md",
   onLinked,
 }: {
   itemId?: string;
+  kind?: LinkKind;
   label?: string;
   variant?: "primary" | "secondary";
   size?: "sm" | "md";
@@ -44,7 +49,9 @@ export function PlaidLinkButton({
     setError(null);
 
     try {
-      const url = itemId ? `/api/plaid/link-token?itemId=${itemId}` : "/api/plaid/link-token";
+      const url = itemId
+        ? `/api/plaid/link-token?itemId=${itemId}`
+        : `/api/plaid/link-token?kind=${kind}`;
       const response = await fetch(url, { method: "POST" });
       const data = await response.json();
 
@@ -61,7 +68,7 @@ export function PlaidLinkButton({
     } finally {
       setLoading(false);
     }
-  }, [itemId]);
+  }, [itemId, kind]);
 
   const onSuccess = useCallback(
     async (publicToken: string, metadata: PlaidLinkOnSuccessMetadata) => {

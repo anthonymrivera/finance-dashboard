@@ -5,7 +5,7 @@ import { plaidItems } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth/session";
 import { decrypt } from "@/lib/crypto";
 import { plaidEnvFor, type PlaidEnv } from "@/lib/env";
-import { createLinkToken, createUpdateModeLinkToken } from "@/lib/plaid/client";
+import { createLinkToken, createUpdateModeLinkToken, type LinkKind } from "@/lib/plaid/client";
 import { describePlaidError } from "@/lib/plaid/errors";
 
 export const runtime = "nodejs";
@@ -15,12 +15,17 @@ export const runtime = "nodejs";
  *
  * Passing `?itemId=` returns an update-mode token, which repairs an existing
  * connection whose login has expired rather than creating a duplicate Item.
+ *
+ * Passing `?kind=investments` requires Investments instead of Transactions, for
+ * a brokerage or retirement login that has no bank accounts or cards in it.
  */
 export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
-  const itemId = new URL(request.url).searchParams.get("itemId");
+  const params = new URL(request.url).searchParams;
+  const itemId = params.get("itemId");
+  const kind: LinkKind = params.get("kind") === "investments" ? "investments" : "banking";
 
   try {
     if (itemId) {
@@ -46,7 +51,7 @@ export async function POST(request: Request) {
     const environment = plaidEnvFor(user.email);
 
     return NextResponse.json({
-      linkToken: await createLinkToken(user.id, environment),
+      linkToken: await createLinkToken(user.id, environment, kind),
       environment,
     });
   } catch (error) {

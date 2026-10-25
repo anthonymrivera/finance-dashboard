@@ -50,8 +50,9 @@ export type SyncResult = {
 
 /**
  * Plaid error codes that mean "this Item legitimately has nothing here" rather
- * than "something broke" — a checking-only bank has no holdings, and an account
- * with no debt has no liabilities. These must not mark the Item as errored.
+ * than "something broke" — a checking-only bank has no holdings, an account
+ * with no debt has no liabilities, and an IRA-only brokerage login has no
+ * transactions. These must not mark the Item as errored.
  */
 const ABSENT_PRODUCT_CODES = new Set([
   "PRODUCTS_NOT_SUPPORTED",
@@ -82,13 +83,18 @@ export async function syncItem(itemId: string): Promise<SyncResult> {
     const environment = item.environment as PlaidEnv;
 
     const accountsUpdated = await syncAccounts(item.id, item.userId, accessToken, environment);
+    // Transactions does not cover investment accounts, so an Item linked as
+    // investments may legitimately have none — the same as holdings below.
     const txResult = await syncTransactions(
       item.id,
       item.userId,
       accessToken,
       item.transactionCursor,
       environment,
-    );
+    ).catch((error: unknown) => {
+      absentProduct(error);
+      return { added: 0, modified: 0, removed: 0 };
+    });
 
     // Investments and liabilities are optional per institution. A bank with
     // neither is normal, so these run independently and never fail the sync.

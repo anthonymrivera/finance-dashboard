@@ -37,9 +37,10 @@ export default async function AccountsPage() {
           label="Holdings"
           first
           action={
-            <div className="flex items-center gap-4">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
               <SyncButton />
               <PlaidLinkButton label="Link bank" size="sm" variant="secondary" />
+              <PlaidLinkButton kind="investments" label="Link investments" size="sm" variant="secondary" />
             </div>
           }
         >
@@ -58,9 +59,10 @@ export default async function AccountsPage() {
           first={index === 0}
           action={
             index === 0 ? (
-              <div className="flex items-center gap-4">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                 <SyncButton />
                 <PlaidLinkButton label="Link bank" size="sm" variant="secondary" />
+                <PlaidLinkButton kind="investments" label="Link investments" size="sm" variant="secondary" />
               </div>
             ) : undefined
           }

@@ -21,7 +21,12 @@ export default async function SettingsPage() {
       <Movement
         label="Linked institutions"
         first
-        action={<PlaidLinkButton label="Link bank" size="sm" variant="secondary" />}
+        action={
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <PlaidLinkButton label="Link bank" size="sm" variant="secondary" />
+            <PlaidLinkButton kind="investments" label="Link investments" size="sm" variant="secondary" />
+          </div>
+        }
       >
         <p className="mb-8 max-w-[52ch] text-[17px]" style={{ color: "var(--muted)" }}>
           Unlinking revokes access at Plaid and deletes the accounts and transactions it synced.

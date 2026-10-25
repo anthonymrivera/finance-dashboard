@@ -60,18 +60,31 @@ export function plaidFor(environment: PlaidEnv): PlaidApi {
  *   Investments  — holdings and positions for brokerage and retirement accounts
  *   Liabilities  — APR, minimum payment, due dates for cards, loans, mortgages
  *
- * Only Transactions is a hard requirement. Every entry in `products` must be
- * matched by at least one account in the login being linked, so requiring
- * Investments too would reject an ordinary checking-and-credit-card Chase login
- * outright, and hide every bank without a brokerage arm from the search list.
- * The other two are taken wherever the institution and selected accounts
- * support them, and the sync already treats their absence as normal.
+ * Plaid requires every entry in `products` to be matched by at least one account
+ * in the login being linked, and no single one of these covers every account
+ * type: Transactions has no investment accounts, Investments has nothing else.
+ * Requiring all three would reject an ordinary checking-and-credit-card Chase
+ * login, and requiring Transactions alone would reject a Vanguard login holding
+ * only an IRA. So each Link session requires the one product that fits the kind
+ * of login being connected, and takes the other two wherever the institution
+ * and selected accounts support them. The sync treats their absence as normal.
  *
  * The cost of the wider scope is a longer Plaid security review and a slightly
  * heavier consent screen at link time.
  */
-const PRODUCTS: Products[] = [Products.Transactions];
-const PRODUCTS_IF_SUPPORTED: Products[] = [Products.Investments, Products.Liabilities];
+export type LinkKind = "banking" | "investments";
+
+const PRODUCTS_BY_KIND: Record<LinkKind, { required: Products[]; ifSupported: Products[] }> = {
+  banking: {
+    required: [Products.Transactions],
+    ifSupported: [Products.Investments, Products.Liabilities],
+  },
+  investments: {
+    required: [Products.Investments],
+    ifSupported: [Products.Transactions, Products.Liabilities],
+  },
+};
+
 const COUNTRY_CODES: CountryCode[] = [CountryCode.Us];
 
 /**
@@ -82,12 +95,13 @@ const COUNTRY_CODES: CountryCode[] = [CountryCode.Us];
 export async function createLinkToken(
   userId: string,
   environment: PlaidEnv,
+  kind: LinkKind = "banking",
 ): Promise<string> {
   const request: LinkTokenCreateRequest = {
     user: { client_user_id: userId },
     client_name: "Finance Dashboard",
-    products: PRODUCTS,
-    required_if_supported_products: PRODUCTS_IF_SUPPORTED,
+    products: PRODUCTS_BY_KIND[kind].required,
+    required_if_supported_products: PRODUCTS_BY_KIND[kind].ifSupported,
     country_codes: COUNTRY_CODES,
     language: "en",
     // Two years of history on first sync instead of the default 90 days — same

@@ -130,11 +130,13 @@ the job has been running.
 **Products.** Transactions, Investments, and Liabilities are all requested at link
 time — meaning balances and history, brokerage holdings, and loan terms (APR,
 minimum payment, due dates). Requesting a product *after* an Item is linked does
-not apply to it; every institution would have to be reconnected. Only Transactions
-is required: Plaid rejects a link outright if any *required* product has no
-matching account, so Investments and Liabilities are requested "if supported" — a
-checking-only login still links, and the sync treats the resulting "no such
-product" error as "nothing here" rather than a failure.
+not apply to it; every institution would have to be reconnected. Plaid rejects a
+link outright if any *required* product has no matching account, and Transactions
+does not cover investment accounts, so there are two ways in: **Link bank**
+requires Transactions, **Link investments** requires Investments, and each takes
+the other products "if supported". A checking-only login and an IRA-only login
+both link, and the sync treats the resulting "no such product" error as "nothing
+here" rather than a failure.
 
 ## Security
 
