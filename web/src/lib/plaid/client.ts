@@ -60,10 +60,18 @@ export function plaidFor(environment: PlaidEnv): PlaidApi {
  *   Investments  — holdings and positions for brokerage and retirement accounts
  *   Liabilities  — APR, minimum payment, due dates for cards, loans, mortgages
  *
+ * Only Transactions is a hard requirement. Every entry in `products` must be
+ * matched by at least one account in the login being linked, so requiring
+ * Investments too would reject an ordinary checking-and-credit-card Chase login
+ * outright, and hide every bank without a brokerage arm from the search list.
+ * The other two are taken wherever the institution and selected accounts
+ * support them, and the sync already treats their absence as normal.
+ *
  * The cost of the wider scope is a longer Plaid security review and a slightly
  * heavier consent screen at link time.
  */
-const PRODUCTS: Products[] = [Products.Transactions, Products.Investments, Products.Liabilities];
+const PRODUCTS: Products[] = [Products.Transactions];
+const PRODUCTS_IF_SUPPORTED: Products[] = [Products.Investments, Products.Liabilities];
 const COUNTRY_CODES: CountryCode[] = [CountryCode.Us];
 
 /**
@@ -79,6 +87,7 @@ export async function createLinkToken(
     user: { client_user_id: userId },
     client_name: "Finance Dashboard",
     products: PRODUCTS,
+    required_if_supported_products: PRODUCTS_IF_SUPPORTED,
     country_codes: COUNTRY_CODES,
     language: "en",
     // Two years of history on first sync instead of the default 90 days — same
